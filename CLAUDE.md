@@ -215,7 +215,7 @@ dependencies {
 > **4차 "혁신 유형"별 15안 (차=센서/플랫폼/새 조작/신뢰·경제/공간/예측): [docs/idea-brainstorm-4.md](docs/idea-brainstorm-4.md)** — 혁신 후보: G1 카 숏컷(차량 이벤트 자동화 플랫폼), S1 와이퍼 기상청, I1 동승자 코파일럿, P1 심부름 자동 끼워넣기.
 > **가족 + 반려동물 조합 7안: [docs/idea-family-pet.md](docs/idea-family-pet.md)** — 추천: 야간 응급 이동 버튼(아이·반려동물, requestTrip으로 실제 ETA 비교), 목적지 반려동물 동반 자동 확인, 조수석 에어백 경고 → 묶음 "펫밀리 모드".
 > **펫밀리 모드 확장 18안 + MVP 구성: [docs/idea-petmily.md](docs/idea-petmily.md)** — MVP(외부 데이터 없이): 출발 전 체크(창문 잠금·에어백·견종 온도), 리드줄 하차 가드, 휴게소 롤콜, 마지막 하차 지점 기록, 주행 기록→정차 시 요약.
-> **사회 문제 × 차량 앱 (웹 조사, 출처 포함): [docs/idea-social-issues.md](docs/idea-social-issues.md)** — 추천: A "받아주는 응급실" 가족 응급 내비(응급실 뺑뺑이, 실시간 병상 공공 API + requestTrip), B EV 지하주차장 안심 인증(EV 화재 불안·단지 갈등, SOC 자동 인증), C 펫밀리를 유기·차내 방치·졸음운전 이슈와 연결.
+> **사회 문제 × 차량 앱 (웹 조사, 출처 포함): [docs/idea-social-issues.md](docs/idea-social-issues.md)** — 추천: A "받아주는 응급실" 가족 응급 내비(응급실 뺑뺑이, 실시간 병상 공공 API + requestTrip), B EV 지하주차장 안심 인증(EV 화재 불안·단지 갈등, SOC 자동 인증), C 펫밀리를 유기·차내 방치·졸음운전 이슈와 연결. **2차 조사 추가: D 고속도로 2차 사고 대피 가이드 + 좌석 센서 인원 확인(2026년 1~5월 2차 사고 사망 400%↑, 정차 순간 동작이라 에뮬레이터 완결) → 새 1순위 후보.** 묶음: 펫밀리(평소) + D(사고) + A(응급).
 > **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
 
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
