@@ -208,6 +208,8 @@ dependencies {
 
 ## 6. 아이디어 (⚠️ 미확정 — 결정 시 §9에 기록하고 이 섹션 갱신)
 
+> **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
+
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
 피할 것: 공식 예시 그대로(음성 메모, 안전운전 점수, 배달 기사용 앱), 준비 중 SDK 의존, 주행 중 영상·게임.
 
@@ -261,6 +263,8 @@ dependencies {
 - 2026-10-22: [주의] 기어 D 즉시(0 km/h) DO 미선언 앱 차단. 앱이 백그라운드면 ~10초 후 freezer로 콜백 끊김 → 상시 감시 기능은 Foreground Service 필요. NaviHelper `requestRoute`/`cancelRoute` 호출 시 Navigation 앱이 전면으로 올라옴.
 - 2026-10-22: [아이디어 영향] 순정 내비가 이미 도착 시 잔량(`remainDestinationChargingValue` Wh, 화면엔 %·"왕복 후 예상 %"), 추천 충전소·`chargingPlan`·`targetSoc` 제공 → 후보 A의 "도착 잔량 예측+충전소 경유" 자체는 차별성 약함. `onChargerOperatorInfo`=사업자 목록뿐. 후보 B는 Telltales 실시간 수신이 동작하나 `PRIVATE_CAR_SAFETY` 허용 여부가 관건(설명회 질문 ④).
 - 2026-10-22: GitHub Organization `SYNC-Dongihwa` 생성(사람), private repo `pleos-app`에 push. 커밋 identity는 repo-local 익명.
+- 2026-10-22: [실측] SOC 2%로 경로 요청 → 순정 내비가 "배터리 부족으로 충전소를 경유합니다"로 충전소 자동 경유(충전 6분, 도착 10%), SDK `onDrivingInfo.waypoints`에 `isChargingStation=true, maxChargingPower=100, chargerCount=4`로 들어옴(단 `isRecommendedChargingStation=false`, `chargingPlan=null`). 충전 스위치 On이어도 에뮬레이터 SOC는 자동 상승 안 함.
+- 2026-10-22: [실측] 경고등(ABS·EV시스템·저전압·엔진오일압) ON → 순정은 클러스터 아이콘만, 텍스트/팝업/알림 없음 (도어·트렁크 열림만 텍스트 팝업). Telltale `color`는 전부 4(매핑 불명). 앱이 freeze 중 받지 못한 Navi 이벤트는 전면 복귀 시 몰아서 도착. A/B 비교 → `docs/idea-comparison.md`.
 
 ---
 
