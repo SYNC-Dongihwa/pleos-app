@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class MonitorService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var notifier: AlertNotifier? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -38,7 +39,7 @@ class MonitorService : Service() {
         if (!enterForeground()) return
         CarSession.start()
         AlertRules(scope).start()
-        AlertNotifier(this, scope).start()
+        notifier = AlertNotifier(this, scope).also { it.start() }
         _running.value = true
     }
 
@@ -55,6 +56,7 @@ class MonitorService : Service() {
     override fun onDestroy() {
         AppLog.i(TAG, "onDestroy")
         scope.cancel()
+        notifier?.stop()
         CarSession.stop()
         _running.value = false
         super.onDestroy()
