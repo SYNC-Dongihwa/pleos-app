@@ -176,6 +176,8 @@ private fun ParkedLayout(
                 ActionButton("첫 경유지 제거", enabled = !busy) { vm.removeWaypoint(WaypointIndex.FIRST) }
                 ActionButton("경유지 모두 제거", enabled = !busy) { vm.removeWaypoint(WaypointIndex.ALL) }
                 ActionButton("경로 취소", enabled = !busy) { vm.cancelRoute() }
+                ActionButton("도착 예상: ${TestPlaces.PANGYO.name}", enabled = !busy) { vm.estimateTrip(TestPlaces.PANGYO) }
+                ActionButton("도착 예상: ${TestPlaces.GANGNEUNG.name}", enabled = !busy) { vm.estimateTrip(TestPlaces.GANGNEUNG) }
             }
             if (lastAction.isNotEmpty()) Line(lastAction)
             Line("※ 경로/경유지 요청 시 Navigation 앱이 전면으로 전환됩니다", Dim)

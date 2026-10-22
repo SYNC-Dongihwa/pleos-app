@@ -209,6 +209,7 @@ dependencies {
 
 ## 6. 아이디어 (⚠️ 미확정 — 결정 시 §9에 기록하고 이 섹션 갱신)
 
+> **새 후보 4안 (방향1 혁신·실용: 1-A 다음 동선 비서, 1-B 충전 출발 신호 / 방향2 가족: 2-A 아이 탑승 모드, 2-B 가족 여행 페이스메이커): [docs/idea-candidates.md](docs/idea-candidates.md) (2026-10-22)** — 사람이 선택 대기 중.
 > **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
 
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
@@ -273,6 +274,7 @@ dependencies {
 - 2026-10-22: [제약] DO meta-data 선언해도 사이드로드 앱은 `isActivityDistractionOptimized=false` → D에서 Pleos 홈이 오버레이로 가림. 서드파티 heads-up은 Pleos `NOTIFICATION_INJECTOR`가 privileged/platformSigned 아니면 미표시. → 에뮬레이터에선 주행 중 표시 경로 없음, 시연은 정차 화면 중심.
 - 2026-10-22: [SDK 규칙] 같은 속성 리스너 하나를 unregister하면 앱 전체 구독이 서비스에서 삭제됨(참조 카운트 없음, 다른 Vehicle 인스턴스 포함) → **속성당 등록 주체는 VehicleMonitor 하나**, Probe는 세션 인스턴스를 빌리고 해제 후 `resubscribe()`. addWaypoint/removeWaypoint는 `onRouteCancelled`→FREE_DRIVE→(~6초)→`onWaypointChanged`→ROUTE_DRIVE 순서, `onWaypointChanged.index`는 다음 경유지(추가한 슬롯 아님).
 - 2026-10-22: [심사 가이드 확인] Vehicle SDK 퍼미션은 앱마켓 사전 승인된 것만 선언 가능(아니면 탈락), 테스트용 더미 데이터 금지(개발자 도구는 debug 빌드 전용으로 처리), 미디어 앱 heads-up 금지·운전 무관 알림 금지.
+- 2026-10-22: [실측] NaviHelper `requestTrip(TripRequest)` → `onTripInfo(distance, eta, estimatedSocAtDest, energyConsumption, summary.routePoints)` 약 0.2초, **Navigation 앱 전면 전환 없음** (판교 3211m/740s/59%, 강릉 195331m/8579s/23%). 도착 SOC는 SOC 속성이 아닌 `EV_BATTERY_LEVEL`(Wh) 기준으로 보임. 충전 경유 포함 여부 미확인. `NaviController.estimateTrip()`으로 래핑 (브랜치 `feat/trip-estimate`). → 아이디어 후보 4안 작성.
 
 ---
 

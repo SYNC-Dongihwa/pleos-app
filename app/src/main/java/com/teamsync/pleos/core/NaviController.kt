@@ -13,6 +13,8 @@ import ai.pleos.playground.navi.data.RouteInfo
 import ai.pleos.playground.navi.data.RouteStartInfo
 import ai.pleos.playground.navi.data.RouteStateInfo
 import ai.pleos.playground.navi.data.RouteWithWaypointsRequest
+import ai.pleos.playground.navi.data.TripInfo
+import ai.pleos.playground.navi.data.TripRequest
 import ai.pleos.playground.navi.data.WaypointArrivedInfo
 import ai.pleos.playground.navi.data.WaypointChangedInfo
 import ai.pleos.playground.navi.data.WaypointInfo
@@ -75,6 +77,7 @@ class NaviController(private val context: Context) {
     @Volatile private var pendingCancel: CompletableDeferred<Unit>? = null
     @Volatile private var pendingWaypointChange: CompletableDeferred<WaypointChangedInfo>? = null
     @Volatile private var pendingWaypointList: CompletableDeferred<List<WaypointInfo>>? = null
+    @Volatile private var pendingTrip: CompletableDeferred<TripInfo>? = null
 
     fun start() {
         if (helper != null) return
@@ -149,6 +152,32 @@ class NaviController(private val context: Context) {
             return@withLock fail(call, "${e.javaClass.simpleName}: ${e.message}", e)
         }
         await(call, deferred, ROUTE_TIMEOUT_MS).also { pendingRoute = null }
+    }
+
+    /**
+     * 경로 안내를 시작하지 않고 목적지까지의 거리·ETA·도착 시 예상 SOC·에너지 소비·충전 경유 계획을 받는다 → onTripInfo까지 대기.
+     * NAVI_ROUTE (requestRoute와 달리 ROUTE_SEARCH 불필요).
+     */
+    suspend fun estimateTrip(destination: Place): Result<TripInfo> = mutex.withLock {
+        val h = helper ?: return@withLock notReady("requestTrip")
+        val call = "requestTrip(${destination.name})"
+        val deferred = CompletableDeferred<TripInfo>().also { pendingTrip = it }
+        try {
+            h.requestTrip(
+                TripRequest(
+                    latitude = destination.latitude,
+                    longitude = destination.longitude,
+                    poiId = "",
+                    poiName = destination.name,
+                    poiSubId = "",
+                ),
+            )
+            AppLog.i(TAG, "$call requested")
+        } catch (e: Exception) {
+            pendingTrip = null
+            return@withLock fail(call, "${e.javaClass.simpleName}: ${e.message}", e)
+        }
+        await(call, deferred, ROUTE_TIMEOUT_MS).also { pendingTrip = null }
     }
 
     /** 경로 취소 → onRouteCancelled까지 대기. NAVI_ROUTE_SEARCH. */
@@ -240,6 +269,7 @@ class NaviController(private val context: Context) {
         pendingCancel?.completeExceptionally(e)
         pendingWaypointChange?.completeExceptionally(e)
         pendingWaypointList?.completeExceptionally(e)
+        pendingTrip?.completeExceptionally(e)
     }
 
     private fun Place.toRequest(index: WaypointIndex) = RequestWaypointInfo(
@@ -299,6 +329,11 @@ class NaviController(private val context: Context) {
         override fun onWayPointArrived(info: WaypointArrivedInfo) = AppLog.i(TAG, "onWayPointArrived $info")
 
         override fun onDestinationArrived(info: DestinationArrivedInfo) = AppLog.i(TAG, "onDestinationArrived $info")
+
+        override fun onTripInfo(info: TripInfo) {
+            AppLog.i(TAG, "onTripInfo distance=${info.distance} eta=${info.eta} socAtDest=${info.estimatedSocAtDest} energy=${info.energyConsumption} points=${info.summary.routePoints}")
+            pendingTrip?.complete(info)
+        }
 
         override fun onError(errorCode: NaviErrorCode) {
             AppLog.e(TAG, "onError(NaviErrorCode=${errorCode.name})")

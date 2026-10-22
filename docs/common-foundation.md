@@ -69,7 +69,7 @@ ProbeActivity (DO 미선언) ── SDK Probe. MonitorService가 떠 있으면 �
 - `onWaypointChanged.index`는 추가·제거한 슬롯이 아니라 **다음 경유지**(항상 FIRST였음) → 목록은 `getWaypointInfo()`로 다시 받아야 함.
 - `removeWaypoint(FIRST)` 후 SECOND가 FIRST로 당겨짐. `WaypointIndex.ALL` 지원.
 - 경로 안내 중이 아닐 때 `addWaypoint` 동작은 미확인 (래퍼가 호출 전에 막음).
-- 모든 경로·경유지 요청은 Navigation 앱을 전면으로 올린다.
+- 모든 경로·경유지 요청은 Navigation 앱을 전면으로 올린다. **예외: `requestTrip`(도착 예상)은 전면 전환 없이 약 0.2초 만에 `onTripInfo`를 준다** (`NaviController.estimateTrip()`).
 - 리스너 nullability(Kotlin): `GearSelectionListener.onSelected(VehicleGear?)`, `TelltaleInfoListener.onTelltaleInfoUpdated(Telltales?)`, SOC/주행가능거리/충전포트는 `Int?/Float?/Boolean?`, `onFailed(Exception)`은 non-null.
 - `android.car`는 기기 bootclasspath(`/apex/com.android.car.framework/javalib/android.car-module.jar`)에 있어 `<uses-library>` 불필요. Pleos 전용 공유 라이브러리 `ai.pleos.playground.car`도 존재(용도 미확인).
 

@@ -40,6 +40,13 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancelRoute() = navi("경로 취소") { CarSession.navi.cancelRoute().map { "취소됨" } }
 
+    fun estimateTrip(place: Place) = navi("도착 예상 ${place.name}") {
+        CarSession.navi.estimateTrip(place).map { t ->
+            val charging = t.summary.routePoints.count { it.poiType?.name == "EV_CHARGING" }
+            "${t.distance}m · eta ${t.eta} · 도착 SOC ${t.estimatedSocAtDest}% · ${t.energyConsumption} · 충전 경유 ${charging}곳"
+        }
+    }
+
     private fun navi(action: String, block: suspend () -> Result<String>) {
         if (_busy.value) return
         _busy.value = true
@@ -58,4 +65,5 @@ object TestPlaces {
     val PANGYO = Place("판교역", 37.394776, 127.111158)
     val JEONGJA = Place("정자역", 37.366950, 127.108380)
     val SEOHYEON = Place("서현역", 37.385050, 127.123400)
+    val GANGNEUNG = Place("강릉역", 37.763700, 128.899900)
 }
