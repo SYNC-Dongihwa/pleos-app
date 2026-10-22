@@ -39,6 +39,14 @@
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
     <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
 
+    <!--
+        진단: Pleos CaaS(ai.pleos.playground.caas)가 TTS_SERVICE·STT_SERVICE·LLM_SERVICE 권한(normal)을 선언함.
+        Android 표준 TextToSpeech는 이 권한이 있어도 초기화 실패(status=-1) → Pleos TextToSpeech SDK 사용 (온디바이스 동작 확인).
+        온디바이스 LLM은 에뮬레이터 CaaS(4.2.10-coral-aosp)에 미탑재(스텁) → 다음 커밋에서 제거 예정.
+    -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <uses-permission android:name="pleos.car.permission.LLM_SERVICE" />
+
     <!-- 상시 수신 Foreground Service (Android 14: 타입별 권한 필요) + 주행 알림 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

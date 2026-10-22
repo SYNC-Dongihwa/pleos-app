@@ -5,7 +5,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.teamsync.pleos.core.CarSession
+import com.teamsync.pleos.core.OnDeviceLlm
 import com.teamsync.pleos.core.Place
+import com.teamsync.pleos.core.SpeechGuide
 import com.teamsync.pleos.log.AppLog
 import com.teamsync.pleos.service.MonitorService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +23,32 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
+
+    private var speech: SpeechGuide? = null
+
+    /** 진단: 표준 TextToSpeech로 한국어 음성 안내가 나오는지. */
+    fun testSpeech() {
+        val guide = speech ?: SpeechGuide(getApplication()).also { speech = it }
+        _lastAction.value = "TTS 테스트 요청 (결과는 PLEOS/Speech 로그)"
+        guide.speak("비상등을 켜고 트렁크를 연 뒤, 가드레일 밖으로 대피하세요.")
+    }
+
+    private var llm: OnDeviceLlm? = null
+
+    /** 진단: 온디바이스 LLM으로 2차 사고 신고 문구 생성 (D안 시나리오). */
+    fun testLlm() = navi("온디바이스 LLM") {
+        val model = llm ?: OnDeviceLlm(getApplication()).also { llm = it }
+        model.generate(
+            "다음 정보로 고속도로 사고 신고 전화에서 읽을 한국어 한두 문장을 만들어줘. " +
+                "위치: 경기 성남시 수정구 시흥동 부근, 진행 방향: 판교IC 방면, 상황: 고장으로 갓길 정차, " +
+                "탑승자: 어른 2명·아이 1명·반려견 1마리, 모두 가드레일 밖으로 대피 완료.",
+        )
+    }
+
+    override fun onCleared() {
+        speech?.shutdown()
+        llm?.release()
+    }
 
     fun startMonitor() = MonitorService.start(getApplication())
 

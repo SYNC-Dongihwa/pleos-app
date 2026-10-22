@@ -20,7 +20,8 @@ dependencyResolutionManagement {
         // Pleos Playground SDK (Vehicle, NaviHelper)
         maven {
             url = uri("https://nexus-playground.pleos.ai/repository/maven-releases/")
-            content { includeGroup("ai.pleos.playground") }
+            // TextToSpeech 등이 ai.pleos.playground.security:universal-access 를 끌어옴 → 하위 그룹까지 허용
+            content { includeGroupByRegex("ai\\.pleos\\.playground(\\..*)?") }
         }
     }
 }

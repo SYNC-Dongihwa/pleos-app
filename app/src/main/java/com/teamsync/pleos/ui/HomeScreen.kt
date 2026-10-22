@@ -168,6 +168,8 @@ private fun ParkedLayout(
         if (BuildConfig.DEBUG) InfoCard("개발자 도구", Modifier.fillMaxWidth()) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ActionButton("SDK Probe 열기") { onOpenProbe() }
+                ActionButton("TTS 테스트") { vm.testSpeech() }
+                ActionButton("LLM 테스트", enabled = !busy) { vm.testLlm() }
                 ActionButton("경로: ${TestPlaces.PANGYO.name}", enabled = !busy) { vm.testRoute() }
                 ActionButton("경유지 +${TestPlaces.JEONGJA.name}", enabled = !busy) { vm.addWaypoint(TestPlaces.JEONGJA) }
                 ActionButton("경유지 +${TestPlaces.SEOHYEON.name}", enabled = !busy) { vm.addWaypoint(TestPlaces.SEOHYEON) }

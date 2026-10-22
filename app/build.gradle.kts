@@ -43,6 +43,8 @@ dependencies {
     implementation(libs.pleos.vehicle)
     implementation(libs.pleos.vehicle.data)
     implementation(libs.pleos.navihelper)
+    implementation(libs.pleos.tts)
+    implementation(libs.pleos.llm)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
