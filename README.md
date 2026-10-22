@@ -19,7 +19,7 @@
 | 대상 | Android Automotive OS, **Pleos Connect Emulator 2.1.0** (API 34, x86_64) |
 | 앱 | Kotlin 2.0.21, Jetpack Compose, minSdk 28 / targetSdk 34 / compileSdk 35 |
 | 빌드 | Gradle 8.13 (wrapper), AGP 8.13.0, **JDK 17 이상** (Android Studio 내장 JBR 21 사용) |
-| SDK | `ai.pleos.playground:Vehicle:2.3.2`, `vehicle-data:1.1.11`, `NaviHelper:3.0.5` (Pleos Nexus) |
+| SDK | `ai.pleos.playground:Vehicle:2.3.2`, `vehicle-data:1.1.11`, `NaviHelper:3.0.5`, `TextToSpeech:3.3.1` (Pleos Nexus) |
 
 ## 다른 컴퓨터에서 이어서 작업하기
 
@@ -27,6 +27,12 @@
 
 ```bash
 git clone https://github.com/SYNC-Dongihwa/pleos-app.git
+```
+
+> **현재 작업 브랜치는 `feat/trip-estimate`** (main에 아직 병합 안 됨 — 도착 예상, AAOS 차량 속성 진단, Pleos TTS 음성 알림, 아이디어·설계 문서 전부 여기 있음). 클론 후 바로 전환:
+
+```bash
+git checkout feat/trip-estimate
 ```
 
 커밋 author에 실명·개인 메일이 들어가면 안 된다. 클론한 뒤 **이 repo에만** 익명 identity를 설정한다 (repo-local 설정은 clone으로 따라오지 않음).
@@ -70,7 +76,8 @@ adb shell am start -n com.teamsync.pleos/.MainActivity
 
 Windows PowerShell이면 `.\gradlew.bat :app:installDebug`. `JAVA_HOME`이 JDK 11 이하로 잡혀 있으면 빌드가 실패하므로 JBR 경로로 바꾼다.
 - 첫 실행 시 알림 권한 다이얼로그 → 허용. 그 뒤 모니터링 서비스가 시작되고 알림 영역에 "차량 상태 모니터링 중"이 상주한다 (홈의 시작/중지 버튼, 알림의 "중지").
-- 홈 하단 **개발자 도구**(debug 빌드에서만 보임): SDK Probe 열기 / 경로: 판교역 / 경유지 +정자역 / 경유지 +서현역 / 첫 경유지 제거 / 경유지 모두 제거 / 경로 취소. 경로·경유지 요청 시 Navigation 앱이 앞으로 나오므로 런처에서 Pleos Dev를 다시 눌러 돌아온다.
+- 홈 하단 **개발자 도구**(debug 빌드에서만 보임): SDK Probe 열기 / TTS 테스트 / 경로: 판교역 / 경유지 +정자역 / 경유지 +서현역 / 첫 경유지 제거 / 경유지 모두 제거 / 경로 취소 / 도착 예상: 판교역·강릉역. 경로·경유지 요청 시 Navigation 앱이 앞으로 나오므로 런처에서 Pleos Dev를 다시 눌러 돌아온다 (도착 예상은 전환 없음).
+- 음성(TTS)이 응답 없이 멈추면 Pleos AI 서비스를 재시작한다: `adb shell am force-stop ai.pleos.playground.caas` (잘못된 로캘 요청 후 서비스가 멈췄던 사례, docs/ondevice-ai-design.md).
 - Probe는 열리면 자동으로 전 도메인을 조사한다(약 5초). 상단 버튼: Vehicle 재실행 / Navi 정보 요청 / 테스트 경로(판교역) / 경로 취소 / 퍼미션 새로고침.
 
 ### 5. Virtual Console (차량 상태 조작)
@@ -80,11 +87,12 @@ adb forward tcp:8088 tcp:8088
 ```
 
 PC 브라우저에서 `http://127.0.0.1:8088/` → 화면의 Gear·Climate·Body 패널, 또는 **Emulation Controls**(SOC, 주행가능거리, 경고등 등 48개 항목)에서 값을 바꾸면 Probe의 LIVE 행이 초록색으로 깜빡이며 갱신된다.
+자동화할 때는 [tools/vc-helper.js](tools/vc-helper.js)를 브라우저 콘솔에 붙여넣고 `__vc.press('Gear Selection','D')`처럼 카드 제목으로 조작한다.
 ⚠️ 기어를 D로 두면 앱이 "주행 중에는 사용할 수 없습니다"로 가려진다. 홈은 DO를 선언했지만 사이드로드 앱이라 인정되지 않는다 (docs/common-foundation.md §3). 화면을 보려면 P로 돌린다. 가려진 동안에도 서비스는 계속 수신한다.
 
 ### 6. 로그 보기
 
-로그 태그는 모두 `PLEOS/` 접두사다 (`PLEOS/Vehicle`, `PLEOS/Navi`, `PLEOS/UX`, `PLEOS/Service`, `PLEOS/Session`, `PLEOS/Alert`, `PLEOS/Notify`, `PLEOS/Perm`, `PLEOS/App`, `PLEOS/UI`). `adb logcat -s 'PLEOS/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
+로그 태그는 모두 `PLEOS/` 접두사다 (`PLEOS/Vehicle`, `PLEOS/Navi`, `PLEOS/UX`, `PLEOS/Service`, `PLEOS/Session`, `PLEOS/Alert`, `PLEOS/Notify`, `PLEOS/Speech`, `PLEOS/Perm`, `PLEOS/App`, `PLEOS/UI`). `adb logcat -s 'PLEOS/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
 
 ```bash
 adb logcat -v time | grep "PLEOS/"
@@ -121,7 +129,7 @@ python -X utf8 tools/summarize_probe_log.py logs/probe.log > docs/probe-table.md
 │  ├─ probe/                 # VehicleProbe(리플렉션 전수 호출), NaviProbe, PermissionReport, ViewModel
 │  └─ ui/                    # HomeScreen, OneLineAlertBar, ProbeScreen (Compose)
 ├─ docs/                     # 실측 결과, 결과표, 스크린샷
-├─ tools/summarize_probe_log.py
+├─ tools/                    # summarize_probe_log.py (Probe 로그 → 결과표), vc-helper.js (Virtual Console 조작)
 └─ apk/                      # 제출용 release APK 위치 (아직 없음)
 ```
 
