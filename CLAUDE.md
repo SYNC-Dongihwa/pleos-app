@@ -292,7 +292,7 @@ dependencies {
 - 2026-10-22: [실측] **Pleos TextToSpeech 3.3.1 온디바이스 동작** (Maven 공개본, 문서상 준비 중): init 0.15s, 첫 모델 로드 0.4~0.9s, 3.8초 분량 합성 0.29s, 화자 seoyoon. 규칙: `TTS_SERVICE` 필수(SDK ApiChecker) / `addEventListener`는 initialize 성공 후 / `Locale.KOREA`(`ko`면 엔진 오류 후 CaaS가 재시작 전까지 멈춤) / `speak(text, isFinal=true)`. Android 표준 TTS는 status=-1로 불가. 의존성 추가 시 repo 필터를 하위 그룹까지 넓혀야 함.
 - 2026-10-22: [실측] **기어 D + Navigation 전면에서 FGS가 낸 TTS 음성은 재생됨**(heads-up은 같은 순간 차단) → 주행 중 서드파티 앱의 유일한 전달 경로. `AlertNotifier`가 WARN 이상을 화면을 볼 수 없을 때 음성으로 읽도록 반영.
 - 2026-10-22: [실측] **온디바이스 LLM 불가**: 에뮬레이터 CaaS(4.2.10-coral-aosp) `OnDeviceLLMManagerImpl` 전 메서드가 "ignored: on-device LLM is disabled" 스텁, 오류 콜백 없음. LLM 진단 코드는 커밋 `e57ad4b`에 보존 후 제거. STT는 CaaS에 실제 구현 존재(미실측). → `docs/ondevice-ai-design.md`.
-- 2026-10-22: [인계] 다른 PC로 이동. **작업 브랜치 `feat/trip-estimate`(main 미병합)**, 작업 트리 깨끗, push 완료. Virtual Console 조작 스크립트 `tools/vc-helper.js` 추가. 다음 할 일: ① 아이디어 확정 (제안: D안 2차 사고 대피 "센서로 확인되는 음성 코치") ② STT 실측(RECORD_AUDIO + STT_SERVICE) ③ 경고등 이름 음성용 한글화 ④ 내비 음성과 겹칠 때 오디오 포커스 확인 ⑤ 10/28 설명회 질문 ①~⑨.
+- 2026-10-22: [인계] 다른 PC로 이동. **`feat/trip-estimate`를 main에 fast-forward 병합** → 모든 작업이 main에 있음, push 완료. Virtual Console 조작 스크립트 `tools/vc-helper.js` 추가. 다음 할 일: ① 아이디어 확정 (제안: D안 2차 사고 대피 "센서로 확인되는 음성 코치") ② STT 실측(RECORD_AUDIO + STT_SERVICE) ③ 경고등 이름 음성용 한글화 ④ 내비 음성과 겹칠 때 오디오 포커스 확인 ⑤ 10/28 설명회 질문 ①~⑨.
 
 ---
 

@@ -29,11 +29,7 @@
 git clone https://github.com/SYNC-Dongihwa/pleos-app.git
 ```
 
-> **현재 작업 브랜치는 `feat/trip-estimate`** (main에 아직 병합 안 됨 — 도착 예상, AAOS 차량 속성 진단, Pleos TTS 음성 알림, 아이디어·설계 문서 전부 여기 있음). 클론 후 바로 전환:
-
-```bash
-git checkout feat/trip-estimate
-```
+> 2026-10-22 기준 작업은 모두 `main`에 있다 (도착 예상, AAOS 차량 속성 진단, Pleos TTS 음성 알림, 아이디어·설계 문서). 새 작업은 `main`에서 브랜치를 만들어 시작한다.
 
 커밋 author에 실명·개인 메일이 들어가면 안 된다. 클론한 뒤 **이 repo에만** 익명 identity를 설정한다 (repo-local 설정은 clone으로 따라오지 않음).
 
