@@ -29,6 +29,16 @@
     <!-- NaviHelper requestRoute()/requestRouteWithWaypoints()/addWaypoint()/removeWaypoint()/cancelRoute() -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
 
+    <!--
+        AAOS 표준 차량 속성 (Pleos SDK에 없는 신호, 진단용): 차속은 CAR_SPEED(dangerous, 런타임 허용),
+        주차 브레이크·기어는 CAR_POWERTRAIN(normal), 야간·외기온도는 CAR_EXTERIOR_ENVIRONMENT(normal).
+        비상등(CAR_EXTERIOR_LIGHTS)은 signature라 서드파티 불가 → 선언하지 않음.
+        ⚠️ 앱마켓 심사에서 허용되는지 미확인 — 기능 확정 시 사용 여부 결정.
+    -->
+    <uses-permission android:name="android.car.permission.CAR_SPEED" />
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
+
     <!-- 상시 수신 Foreground Service (Android 14: 타입별 권한 필요) + 주행 알림 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

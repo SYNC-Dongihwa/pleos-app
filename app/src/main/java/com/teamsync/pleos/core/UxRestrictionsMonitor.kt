@@ -1,8 +1,11 @@
 package com.teamsync.pleos.core
 
 import android.car.Car
+import android.car.VehiclePropertyIds
 import android.car.drivingstate.CarUxRestrictions
 import android.car.drivingstate.CarUxRestrictionsManager
+import android.car.hardware.CarPropertyValue
+import android.car.hardware.property.CarPropertyManager
 import android.content.Context
 import com.teamsync.pleos.log.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +102,52 @@ class UxRestrictionsMonitor(private val context: Context) {
         AppLog.i(TAG, "connected, listener registered")
         apply(m.currentCarUxRestrictions, "initial")
         logDistractionOptimized(c)
+        logAaosProperties(c)
+    }
+
+    /**
+     * 진단: Pleos Vehicle SDK에 없는 신호(차속·주차 브레이크·야간·외기온도·비상등)를 AAOS 표준 CarPropertyManager로 읽을 수 있는지.
+     * CAR_SPEED는 dangerous(런타임 허용 필요), CAR_POWERTRAIN·CAR_EXTERIOR_ENVIRONMENT는 normal, 비상등의 CAR_EXTERIOR_LIGHTS는 signature (2026-10-22 실측).
+     */
+    private fun logAaosProperties(c: Car) {
+        val pm = try {
+            c.getCarManager(Car.PROPERTY_SERVICE) as? CarPropertyManager
+        } catch (e: Exception) {
+            AppLog.e(TAG, "getCarManager(PROPERTY_SERVICE) threw ${e.message}", e)
+            null
+        } ?: return
+        fun read(name: String, block: () -> Any?) = try {
+            AppLog.i(TAG, "AAOS $name = ${block()}")
+        } catch (e: Exception) {
+            AppLog.w(TAG, "AAOS $name failed: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        read("PERF_VEHICLE_SPEED(m/s)") { pm.getFloatProperty(VehiclePropertyIds.PERF_VEHICLE_SPEED, 0) }
+        read("PARKING_BRAKE_ON") { pm.getBooleanProperty(VehiclePropertyIds.PARKING_BRAKE_ON, 0) }
+        read("NIGHT_MODE") { pm.getBooleanProperty(VehiclePropertyIds.NIGHT_MODE, 0) }
+        read("ENV_OUTSIDE_TEMPERATURE(C)") { pm.getFloatProperty(VehiclePropertyIds.ENV_OUTSIDE_TEMPERATURE, 0) }
+        read("HAZARD_LIGHTS_STATE") { pm.getIntProperty(VehiclePropertyIds.HAZARD_LIGHTS_STATE, 0) }
+        try {
+            val ok = pm.registerCallback(speedCallback, VehiclePropertyIds.PERF_VEHICLE_SPEED, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+            AppLog.i(TAG, "AAOS speed callback registered=$ok")
+        } catch (e: Exception) {
+            AppLog.w(TAG, "AAOS speed callback failed: ${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    @Volatile private var lastSpeed = -1f
+
+    private val speedCallback = object : CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: CarPropertyValue<*>) {
+            val speed = (value.value as? Float) ?: return
+            if (kotlin.math.abs(speed - lastSpeed) >= 0.5f) {
+                AppLog.i(TAG, "AAOS speed → ${"%.1f".format(speed * 3.6f)} km/h")
+                lastSpeed = speed
+            }
+        }
+
+        override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            AppLog.w(TAG, "AAOS speed onErrorEvent prop=$propertyId area=$areaId")
+        }
     }
 
     /** 진단: 시스템(CarPackageManagerService)이 우리 Activity들을 DO로 인정하는지. 매니페스트 선언만으로 충분한지 판단용. */
