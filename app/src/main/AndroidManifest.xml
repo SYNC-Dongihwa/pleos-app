@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="true" />
+
+    <!--
+        SDK Probe 단계: 모든 도메인의 조회(check/get/register) API를 호출하므로 조회 퍼미션 전체를 선언한다.
+        퍼미션 목록은 AAR Impl 클래스의 @RequiresCustomPermission 집계 결과 (CLAUDE.md §9 2026-10-22).
+        ⚠️ 실제 앱 기능이 정해지면 쓰는 것만 남길 것 (미사용 퍼미션 = 앱마켓 심사 반려 사유).
+    -->
+    <uses-permission android:name="pleos.car.permission.CAR_CLIMATE" />   <!-- HVAC, SteeringWheel 열선 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />     <!-- Door -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />     <!-- Brake, DrivingMode, Gear, Odometer, SteeringWheel 각도 -->
+    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />    <!-- EvBattery, Fuel -->
+    <uses-permission android:name="pleos.car.permission.CAR_INFO" />      <!-- CarInfo, Display, EvBattery 용량 -->
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />    <!-- Light, TurnSignal -->
+    <uses-permission android:name="pleos.car.permission.CAR_MIRRORS" />   <!-- SideMirror -->
+    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />    <!-- Safety, Tire -->
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />     <!-- Seat -->
+    <uses-permission android:name="pleos.car.permission.CAR_TOLL" />      <!-- Toll -->
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />   <!-- Window, Wiper -->
+    <!-- PRIVATE_*: 3rd-party 앱에 부여되는지 확인용 (CarInfo.getCapabilityInfo, Safety 경고등, Tire 공기압) -->
+    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_INFO" />
+    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_SAFETY" />
+    <!-- NaviHelper get*Info() -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <!-- NaviHelper requestRoute()/cancelRoute() — Probe의 "테스트 경로" 버튼 -->
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+
+    <application
+        android:name=".ProbeApp"
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

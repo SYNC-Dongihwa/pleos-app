@@ -1,0 +1,23 @@
+# Gradle / Android Studio
+.gradle/
+build/
+/local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit (CLAUDE.md §7)
+*.jks
+*.keystore
+keystore.properties
+secrets.properties
+
+# Pulled device logs
+/logs/
