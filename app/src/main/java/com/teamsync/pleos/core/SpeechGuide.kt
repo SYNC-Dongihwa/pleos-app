@@ -14,6 +14,7 @@ import java.util.Locale
  *
  * 실측(2026-10-22): Android 표준 `android.speech.tts.TextToSpeech`는 엔진(ai.pleos.playground.caas)이 보이고
  * `pleos.car.permission.TTS_SERVICE`를 선언해도 초기화 status=-1로 실패 → Pleos SDK(문서상 "준비 중", Maven엔 3.3.1 공개)를 사용.
+ * 에뮬레이터 실측: 모델 로드 0.4~0.9s(첫 호출), 문장 3.8s 분량 합성 0.29s, 요청→재생 시작 약 0.5s. 화자 seoyoon.
  */
 class SpeechGuide(context: Context) {
 
