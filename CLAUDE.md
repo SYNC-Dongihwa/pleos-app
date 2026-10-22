@@ -135,11 +135,13 @@ adb forward tcp:8088 tcp:8088
 | **Vehicle State (조회)** | ✅ 신청 없이 사용 가능 |
 | **NaviHelper** | ✅ 신청 없이 사용 가능 |
 | FusedLocation | ⛔ 준비 중(Coming Soon) — 신청 불가 |
-| TextToSpeech | ⛔ 준비 중 |
-| SpeechToText | ⛔ 준비 중 |
+| TextToSpeech | ⛔ 문서상 준비 중 → **[실측] Maven 3.3.1 공개, 에뮬레이터에서 온디바이스 한국어 음성 동작** (주행 중·백그라운드 FGS에서도 재생). 공모전 사용 허용 여부는 설명회 질문 ⑨ |
+| SpeechToText | ⛔ 문서상 준비 중 → Maven 3.3.1 공개, CaaS에 온디바이스 구현 있음(미실측) |
+| LLM (문서에 없음) | Maven 2.1.3.2 공개. **[실측] 에뮬레이터 온디바이스 LLM은 스텁(요청 무시, 콜백 없음)** → 사용 불가. 서버 모드는 Playground 자격 필요(미시험) |
 | Vehicle Control (제어/set) | ⛔ 준비 중 |
 
 → **핵심 기능은 Vehicle State + NaviHelper로만 설계한다.** 준비 중 SDK에 의존하는 기능은 넣지 않는다 (상태 바뀌면 §9에 기록 후 재검토).
+→ TTS는 **전달 수단(부가)** 으로만 사용: 코어 판단은 Vehicle·NaviHelper, TTS가 없으면 화면만 표시. 사용 규칙·수치는 [docs/ondevice-ai-design.md](docs/ondevice-ai-design.md).
 
 ### Maven / 의존성
 ```kotlin
@@ -154,8 +156,10 @@ dependencies {
     implementation("ai.pleos.playground:Vehicle:2.3.2")
     implementation("ai.pleos.playground:vehicle-data:1.1.11") // ErrorCode 등. Vehicle이 runtime 스코프로만 노출해서 직접 추가 (실측)
     implementation("ai.pleos.playground:NaviHelper:3.0.5")
+    implementation("ai.pleos.playground:TextToSpeech:3.3.1") // 문서상 준비 중, Maven 공개본. 하위 그룹 ai.pleos.playground.security 도 끌어옴
 }
 ```
+> settings의 repo 필터는 `includeGroupByRegex("ai\\.pleos\\.playground(\\..*)?")` — `includeGroup("ai.pleos.playground")`만 두면 TTS의 `security:universal-access`를 못 찾음 (실측).
 > 실제 적용: `gradle/libs.versions.toml` + `app/build.gradle.kts`. **SDK 실측 결과는 `docs/sdk-probe-results.md`가 이 섹션보다 우선.**
 
 ### Vehicle SDK 사용 패턴
@@ -198,7 +202,7 @@ dependencies {
   - 실측: 에뮬레이터에서 **기어 D가 되는 즉시(0 km/h여도)** "주행 중에는 사용할 수 없습니다"로 차단. 차단 중에도 프로세스는 살아 있어 SDK 콜백은 계속 옴
   - 실측: 앱이 백그라운드로 가면 ~10초 뒤 cached-app freezer가 프로세스를 얼려 SDK 콜백 수신 중단 → 백그라운드 감시는 Foreground Service 필요 → **구현·검증 완료** (`MonitorService`, type=specialUse, 백그라운드 36초에도 `curProcState=4`, freeze 없음)
   - DO 선언: 홈(`MainActivity`)에 `<meta-data android:name="distractionOptimized" android:value="true"/>` 선언함. **실측: 사이드로드 앱은 인정 안 됨** — `CarPackageManager.isActivityDistractionOptimized=false`, Pleos 홈 화면이 앱 영역에 차단 오버레이. 에뮬레이터엔 앱마켓 없음(허용 목록=서명 일치 시스템 앱). 마켓 설치 시 인정되는지 [미검증] → 설명회 질문 ⑥
-  - 실측: **서드파티 heads-up 미표시** — Pleos `NOTIFICATION_INJECTOR`가 privileged/platformSigned 아니면 띄우지 않음 → 설명회 질문 ⑦. 결국 에뮬레이터에선 D 동안 서드파티 앱이 운전자에게 보여줄 경로가 없음 (`docs/common-foundation.md` §3)
+  - 실측: **서드파티 heads-up 미표시** — Pleos `NOTIFICATION_INJECTOR`가 privileged/platformSigned 아니면 띄우지 않음 → 설명회 질문 ⑦. 결국 에뮬레이터에선 D 동안 서드파티 앱이 운전자에게 보여줄 경로가 없음 (`docs/common-foundation.md` §3). **단, Pleos TTS 음성은 D + 다른 앱 전면에서도 재생됨 [실측] → 주행 중 전달은 음성으로** (`docs/ondevice-ai-design.md`)
   - `useLibrary("android.car")`로 컴파일(런타임은 기기 car framework apex에 있어 `<uses-library>` 불필요) — 적용됨
 - 주행 중 제한(한국 = "그외 지역", **실측 일치: D/N에서 `0x50 NO_VIDEO|NO_SETUP`**): 미디어 로그인/설정/검색, 차량 설정(도어·시트), 동영상, QR 로그인, 대용량 텍스트 ⛔ / 키보드·다이얼패드·검색·내비 검색은 허용 표기 (단, 디자인 가이드는 주행 중 키보드 입력 지양)
 - 플래그: NO_DIALPAD(1), NO_FILTERING(2), LIMIT_STRING_LENGTH(4), NO_KEYBOARD(8), NO_VIDEO(16), LIMIT_CONTENT(32), NO_SETUP(64)
@@ -217,6 +221,8 @@ dependencies {
 > **펫밀리 모드 확장 18안 + MVP 구성: [docs/idea-petmily.md](docs/idea-petmily.md)** — MVP(외부 데이터 없이): 출발 전 체크(창문 잠금·에어백·견종 온도), 리드줄 하차 가드, 휴게소 롤콜, 마지막 하차 지점 기록, 주행 기록→정차 시 요약.
 > **사회 문제 × 차량 앱 (웹 조사, 출처 포함): [docs/idea-social-issues.md](docs/idea-social-issues.md)** — 추천: A "받아주는 응급실" 가족 응급 내비(응급실 뺑뺑이, 실시간 병상 공공 API + requestTrip), B EV 지하주차장 안심 인증(EV 화재 불안·단지 갈등, SOC 자동 인증), C 펫밀리를 유기·차내 방치·졸음운전 이슈와 연결. **2차 조사 추가: D 고속도로 2차 사고 대피 가이드 + 좌석 센서 인원 확인(2026년 1~5월 2차 사고 사망 400%↑, 정차 순간 동작이라 에뮬레이터 완결) → 새 1순위 후보.** 묶음: 펫밀리(평소) + D(사고) + A(응급).
 > **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
+
+> **Pleos API 코어 + 온디바이스 AI 부가 설계 (실측): [docs/ondevice-ai-design.md](docs/ondevice-ai-design.md) (2026-10-22)** — Pleos TTS 온디바이스 ✅(주행 중 유일하게 운전자에게 닿는 경로), 온디바이스 LLM ❌(에뮬레이터 스텁), STT 구현만 확인. 제안: "센서로 확인되는 음성 코치"(D안 비트박스 단계 안내·펫밀리 롤콜·응급 ETA 음성).
 
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
 피할 것: 공식 예시 그대로(음성 메모, 안전운전 점수, 배달 기사용 앱), 준비 중 SDK 의존, 주행 중 영상·게임.
@@ -255,7 +261,7 @@ dependencies {
 
 - [ ] **M0 (~10/26)** ~~에뮬레이터 + Virtual Console 구동~~ ✅ / ~~빈 프로젝트에 Vehicle·NaviHelper 의존성 추가 후 빌드 성공~~ ✅ (10/22) / Playground 가입·프로젝트 생성 ⬜ (사람이 직접)
 - [ ] **M1 (~10/27) SDK Probe 화면**: ~~전 도메인 Capability/Get/Callback + NaviHelper 이벤트 실시간 표시·로그~~ ✅ / ~~Virtual Console 조작 시 값 변화 확인, 사용 가능 데이터 목록 기록~~ ✅ (10/22, `docs/sdk-probe-results.md`) / **아이디어 확정 ⬜**
-- [ ] 10/28 설명회 질문: ① 준비 중 SDK 공모 기간 내 오픈 여부 ② 표준 Android API(TTS/위치) 대체 시 기술 활용성 인정 여부 ③ PT 시연 장비(본인 노트북+에뮬레이터 OK?) ④ **`PRIVATE_CAR_SAFETY`(경고등·타이어)·`PRIVATE_CAR_INFO`를 3rd-party 앱이 써도 되는지** (에뮬레이터에선 normal로 부여됨) ⑤ 차량용 앱의 Foreground Service 허용 여부·타입 (현재 `specialUse`) ⑥ **DO 인정 방식** — 매니페스트 meta-data를 넣었지만 사이드로드 앱은 `isActivityDistractionOptimized=false`. 마켓 설치 시 인정? 에뮬레이터에서 DO 앱을 시연·테스트하는 방법? ⑦ **서드파티 앱의 주행 중 알림(heads-up) 표시 방법** (현재 Pleos가 비권한 앱 HUN을 띄우지 않음) ⑧ Vehicle SDK 퍼미션 **사전 승인 절차** (심사 기준: 승인 안 된 퍼미션 선언 시 탈락)
+- [ ] 10/28 설명회 질문: ① 준비 중 SDK 공모 기간 내 오픈 여부 ② 표준 Android API(TTS/위치) 대체 시 기술 활용성 인정 여부 ③ PT 시연 장비(본인 노트북+에뮬레이터 OK?) ④ **`PRIVATE_CAR_SAFETY`(경고등·타이어)·`PRIVATE_CAR_INFO`를 3rd-party 앱이 써도 되는지** (에뮬레이터에선 normal로 부여됨) ⑤ 차량용 앱의 Foreground Service 허용 여부·타입 (현재 `specialUse`) ⑥ **DO 인정 방식** — 매니페스트 meta-data를 넣었지만 사이드로드 앱은 `isActivityDistractionOptimized=false`. 마켓 설치 시 인정? 에뮬레이터에서 DO 앱을 시연·테스트하는 방법? ⑦ **서드파티 앱의 주행 중 알림(heads-up) 표시 방법** (현재 Pleos가 비권한 앱 HUN을 띄우지 않음) ⑧ Vehicle SDK 퍼미션 **사전 승인 절차** (심사 기준: 승인 안 된 퍼미션 선언 시 탈락) ⑨ **TTS·STT·LLM SDK** — 문서상 준비 중인데 Maven 공개본(TTS 3.3.1)이 에뮬레이터에서 동작함. 공모전에서 써도 되는지, `TTS_SERVICE` 승인 대상인지, 실차 온디바이스 LLM 탑재·서드파티 허용, LLM 서버 모드 자격 발급, 주행 중 서드파티 음성 안내 정책
 - [x] **공통 기반 (10/22)**: FGS 상시 수신 / CarUxRestrictions 구독 + 주행·정차 레이아웃 / 1줄 알림(앱 내 바 + heads-up 게시) / NaviHelper 경유지 래퍼 — `docs/common-foundation.md`, 브랜치 `feat/common-foundation`
 - [ ] **M2 (~11/10)** 핵심 기능 1~2개 실제 동작 + CarUxRestrictions 처리
 - [ ] **M3 (~11/14)** release APK 빌드·서명, 블라인드 GitHub(Organization) 업로드, README, 시연 영상(에뮬레이터 화면녹화 + Virtual Console 조작), 기획서 작성(MAU·Retention 근거 포함)
@@ -283,6 +289,9 @@ dependencies {
 - 2026-10-22: [실측] NaviHelper `requestTrip(TripRequest)` → `onTripInfo(distance, eta, estimatedSocAtDest, energyConsumption, summary.routePoints)` 약 0.2초, **Navigation 앱 전면 전환 없음** (판교 3211m/740s/59%, 강릉 195331m/8579s/23%). 도착 SOC는 SOC 속성이 아닌 `EV_BATTERY_LEVEL`(Wh) 기준으로 보임. 충전 경유 포함 여부 미확인. `NaviController.estimateTrip()`으로 래핑 (브랜치 `feat/trip-estimate`). → 아이디어 후보 4안 작성.
 - 2026-10-22: [실측] **AAOS 표준 `CarPropertyManager`로 Pleos SDK에 없는 신호 읽기 가능**: `PERF_VEHICLE_SPEED`(권한 `android.car.permission.CAR_SPEED` = dangerous, 런타임 허용), `PARKING_BRAKE_ON`(CAR_POWERTRAIN normal), `NIGHT_MODE`·`ENV_OUTSIDE_TEMPERATURE`(CAR_EXTERIOR_ENVIRONMENT normal). **비상등 `HAZARD_LIGHTS_STATE`는 signature라 SecurityException**, Pleos `TurnSignalValue`도 OFF/LEFT/RIGHT뿐 → 비상등은 서드파티가 알 수 없음. 콘솔 가속(ACCEL)은 입력 방식이 `http-g29`라 마우스·키보드로 재현 불가 → 차속 변화 미확인. NaviHelper 경로 상태에 `TrafficEventType.ACCIDENT` 이벤트 존재, `CruiseControl.ACTIVATED`로 ACC 작동 감지 가능. → `docs/secondary-accident-api.md`. AAOS 표준 퍼미션의 심사 허용 여부는 설명회 질문.
 - 2026-10-22: [실측] 좌석 점유: 콘솔 "빈자리" → `registerSeatOccupancy(ROW_2_LEFT)=false` 실시간 수신, 뒷문 1→0 수신. 콘솔 "탑승" 복귀는 에뮬레이터 단 발행만 되고 Vehicle 서비스 이벤트 없음(에뮬레이터 이슈 추정). 순정 `PLEOS_CAR_SERVICE` 안전벨트 경고가 좌석 점유 사용. → 2차 후보 4안 작성.
+- 2026-10-22: [실측] **Pleos TextToSpeech 3.3.1 온디바이스 동작** (Maven 공개본, 문서상 준비 중): init 0.15s, 첫 모델 로드 0.4~0.9s, 3.8초 분량 합성 0.29s, 화자 seoyoon. 규칙: `TTS_SERVICE` 필수(SDK ApiChecker) / `addEventListener`는 initialize 성공 후 / `Locale.KOREA`(`ko`면 엔진 오류 후 CaaS가 재시작 전까지 멈춤) / `speak(text, isFinal=true)`. Android 표준 TTS는 status=-1로 불가. 의존성 추가 시 repo 필터를 하위 그룹까지 넓혀야 함.
+- 2026-10-22: [실측] **기어 D + Navigation 전면에서 FGS가 낸 TTS 음성은 재생됨**(heads-up은 같은 순간 차단) → 주행 중 서드파티 앱의 유일한 전달 경로. `AlertNotifier`가 WARN 이상을 화면을 볼 수 없을 때 음성으로 읽도록 반영.
+- 2026-10-22: [실측] **온디바이스 LLM 불가**: 에뮬레이터 CaaS(4.2.10-coral-aosp) `OnDeviceLLMManagerImpl` 전 메서드가 "ignored: on-device LLM is disabled" 스텁, 오류 콜백 없음. LLM 진단 코드는 커밋 `e57ad4b`에 보존 후 제거. STT는 CaaS에 실제 구현 존재(미실측). → `docs/ondevice-ai-design.md`.
 
 ---
 
