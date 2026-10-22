@@ -212,6 +212,7 @@ dependencies {
 > **1차 후보 4안: [docs/idea-candidates.md](docs/idea-candidates.md)** — 피드백: 방향1은 테슬라에 유사 기능, 방향2는 너무 감성적.
 > **2차 후보 4안 (1-C 업무용 운행기록부 자동 작성, 1-D 동승 비용 자동 정산 / 2-C EV 차박 전력 플래너, 2-D 통학차량 승하차 기록): [docs/idea-candidates-2.md](docs/idea-candidates-2.md) (2026-10-22)** — 사람이 선택 대기 중.
 > **3차 브레인스토밍 (공모전 8개 이동 순간별 21안, 특이·괴상 포함, 실현성·시연 가능성 태그): [docs/idea-brainstorm-3.md](docs/idea-brainstorm-3.md)** — 의외의 강자: P1 지하 주차 층수 추정(조향각), E1 충전기 실측 속도 기록, F1 좌석별 멀미 지수, X1 차가 쓰는 일기.
+> **4차 "혁신 유형"별 15안 (차=센서/플랫폼/새 조작/신뢰·경제/공간/예측): [docs/idea-brainstorm-4.md](docs/idea-brainstorm-4.md)** — 혁신 후보: G1 카 숏컷(차량 이벤트 자동화 플랫폼), S1 와이퍼 기상청, I1 동승자 코파일럿, P1 심부름 자동 끼워넣기.
 > **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
 
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
