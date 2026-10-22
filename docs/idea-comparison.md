@@ -40,6 +40,8 @@
 - 백그라운드 ~10초 후 프로세스 freeze → 운전 중 감시는 **Foreground Service** 필요 (Pleos 시스템 앱들도 FGS 알림을 띄우고 있음 — 3rd-party 허용 여부 [미검증]).
 - `requestRoute`/`addWaypoint` 계열 호출 시 Navigation 앱이 전면으로 → 우리 앱은 화면에서 밀려남. 경유지 추가는 "버튼 → 내비로 전환" 흐름으로 설계.
 - Vehicle SDK에 차속 없음. 주행 맥락은 Gear + NaviHelper(`onNavigationStatus`, 남은 거리)로 판단.
+- (공통 기반 구현 후 추가 실측, [common-foundation.md](common-foundation.md) §3) **에뮬레이터에서 서드파티 앱은 주행 중(D) 운전자에게 보여줄 경로가 없다**: DO meta-data가 사이드로드 앱에선 인정되지 않아 화면이 가려지고, heads-up도 Pleos가 띄우지 않는다. 두 후보 모두 "주행 중 알림" 시연은 불가 → 정차 화면·D→P 전환 직후 요약으로 설계. B(경고등 알림)가 더 큰 타격.
+- 심사 기준: Vehicle SDK 퍼미션은 앱마켓 **사전 승인**된 것만 선언 가능 → B의 `PRIVATE_CAR_SAFETY`는 승인이 전제.
 
 ## 2. 후보 A — 차별화 방향
 

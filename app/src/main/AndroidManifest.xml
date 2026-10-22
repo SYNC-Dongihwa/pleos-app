@@ -26,22 +26,45 @@
     <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_SAFETY" />
     <!-- NaviHelper get*Info() -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
-    <!-- NaviHelper requestRoute()/cancelRoute() — Probe의 "테스트 경로" 버튼 -->
+    <!-- NaviHelper requestRoute()/requestRouteWithWaypoints()/addWaypoint()/removeWaypoint()/cancelRoute() -->
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
 
+    <!-- 상시 수신 Foreground Service (Android 14: 타입별 권한 필요) + 주행 알림 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
-        android:name=".ProbeApp"
+        android:name=".PleosApp"
         android:allowBackup="false"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <!-- 홈: DO 선언 → 주행 중에도 표시, 대신 CarUxRestrictions로 화면을 직접 줄인다 -->
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true" />
         </activity>
+        <!-- SDK Probe: DO 미선언 (텍스트 과다 → 주행 중 시스템이 가림) -->
+        <activity
+            android:name=".ProbeActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".service.MonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps receiving vehicle state (warning lights, battery) and navigation events while another app such as Navigation is in front, to show glanceable driver alerts." />
+        </service>
     </application>
 </manifest>

@@ -3,6 +3,7 @@ package com.teamsync.pleos.probe
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.teamsync.pleos.core.CarSession
 import com.teamsync.pleos.log.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -10,7 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class ProbeViewModel(app: Application) : AndroidViewModel(app) {
 
-    val vehicle = VehicleProbe(app, viewModelScope)
+    val vehicle = VehicleProbe(app, viewModelScope, CarSession.vehicle.sdkVehicle) {
+        CarSession.vehicle.resubscribe("probe unregistered listeners")
+    }
     val navi = NaviProbe(app)
 
     private val _permissions = MutableStateFlow<List<PermissionState>>(emptyList())

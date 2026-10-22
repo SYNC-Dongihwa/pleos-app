@@ -3,10 +3,14 @@
 > 현대자동차그룹 차량용 앱 개발 공모전 출품 예정 앱. **현재 단계: M1 — SDK Probe** (앱 아이디어 확정 전).
 > 앱 이름·한 줄 소개·APK 위치는 아이디어 확정 후 채운다 (제출 형식은 [CLAUDE.md](CLAUDE.md) §2).
 
-지금 들어 있는 앱은 **Pleos SDK Probe**다. Vehicle SDK 전 도메인(20개)의 Capability/Get/Callback과 NaviHelper 이벤트를 실제로 호출해서 화면에 실시간으로 보여주고, 모든 결과를 로그로 남긴다.
-실측 결과는 [docs/sdk-probe-results.md](docs/sdk-probe-results.md), API별 전체 표는 [docs/probe-table.md](docs/probe-table.md)에 있다.
+지금 들어 있는 것 (런처 이름 **Pleos Dev**):
+- **홈 (공통 기반)** — Foreground Service로 차량·내비 상태 상시 수신, CarUxRestrictions에 따라 주행/정차 레이아웃 전환, 1줄 주행 알림, NaviHelper 경유지 래퍼. 설계·검증: [docs/common-foundation.md](docs/common-foundation.md)
+- **SDK Probe** (홈 → 개발자 도구 → SDK Probe 열기) — Vehicle SDK 전 도메인(20개)의 Capability/Get/Callback과 NaviHelper 이벤트를 실제로 호출해 실시간 표시·로그. 실측 결과: [docs/sdk-probe-results.md](docs/sdk-probe-results.md), 전체 표: [docs/probe-table.md](docs/probe-table.md)
+- 아이디어 비교: [docs/idea-comparison.md](docs/idea-comparison.md)
 
-![SDK Probe](docs/img/probe-screen.png)
+| 홈 (정차) | 1줄 알림 | SDK Probe |
+|---|---|---|
+| ![홈](docs/img/home-parked.png) | ![알림](docs/img/home-alert-bar.png) | ![Probe](docs/img/probe-screen.png) |
 
 ## 테스트 환경
 
@@ -65,7 +69,9 @@ adb shell am start -n com.teamsync.pleos/.MainActivity
 ```
 
 Windows PowerShell이면 `.\gradlew.bat :app:installDebug`. `JAVA_HOME`이 JDK 11 이하로 잡혀 있으면 빌드가 실패하므로 JBR 경로로 바꾼다.
-Probe는 실행 직후 자동으로 전 도메인을 조사한다(약 5초). 상단 버튼: Vehicle 재실행 / Navi 정보 요청 / 테스트 경로(판교역) / 경로 취소 / 퍼미션 새로고침.
+- 첫 실행 시 알림 권한 다이얼로그 → 허용. 그 뒤 모니터링 서비스가 시작되고 알림 영역에 "차량 상태 모니터링 중"이 상주한다 (홈의 시작/중지 버튼, 알림의 "중지").
+- 홈 하단 **개발자 도구**(debug 빌드에서만 보임): SDK Probe 열기 / 경로: 판교역 / 경유지 +정자역 / 경유지 +서현역 / 첫 경유지 제거 / 경유지 모두 제거 / 경로 취소. 경로·경유지 요청 시 Navigation 앱이 앞으로 나오므로 런처에서 Pleos Dev를 다시 눌러 돌아온다.
+- Probe는 열리면 자동으로 전 도메인을 조사한다(약 5초). 상단 버튼: Vehicle 재실행 / Navi 정보 요청 / 테스트 경로(판교역) / 경로 취소 / 퍼미션 새로고침.
 
 ### 5. Virtual Console (차량 상태 조작)
 
@@ -74,18 +80,18 @@ adb forward tcp:8088 tcp:8088
 ```
 
 PC 브라우저에서 `http://127.0.0.1:8088/` → 화면의 Gear·Climate·Body 패널, 또는 **Emulation Controls**(SOC, 주행가능거리, 경고등 등 48개 항목)에서 값을 바꾸면 Probe의 LIVE 행이 초록색으로 깜빡이며 갱신된다.
-⚠️ 기어를 D로 두면 앱이 "주행 중에는 사용할 수 없습니다"로 가려진다 (DO 미선언). 화면을 보려면 P로 돌린다.
+⚠️ 기어를 D로 두면 앱이 "주행 중에는 사용할 수 없습니다"로 가려진다. 홈은 DO를 선언했지만 사이드로드 앱이라 인정되지 않는다 (docs/common-foundation.md §3). 화면을 보려면 P로 돌린다. 가려진 동안에도 서비스는 계속 수신한다.
 
 ### 6. 로그 보기
 
-로그 태그는 모두 `PLEOS/` 접두사다 (`PLEOS/Vehicle`, `PLEOS/Navi`, `PLEOS/Perm`, `PLEOS/App`, `PLEOS/UI`). `adb logcat -s 'PLEOS/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
+로그 태그는 모두 `PLEOS/` 접두사다 (`PLEOS/Vehicle`, `PLEOS/Navi`, `PLEOS/UX`, `PLEOS/Service`, `PLEOS/Session`, `PLEOS/Alert`, `PLEOS/Notify`, `PLEOS/Perm`, `PLEOS/App`, `PLEOS/UI`). `adb logcat -s 'PLEOS/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
 
 ```bash
 adb logcat -v time | grep "PLEOS/"
 ```
 
 ```bash
-adb logcat -v time -s PLEOS/Vehicle PLEOS/Navi PLEOS/Perm PLEOS/App PLEOS/UI
+adb logcat -v time -s PLEOS/Vehicle PLEOS/Navi PLEOS/UX PLEOS/Service PLEOS/Alert PLEOS/Notify
 ```
 
 앱 내부 로그 파일 (AAOS 에뮬레이터의 앱 사용자는 **user 10**, 날짜는 에뮬레이터 시간대 PDT 기준):
@@ -106,10 +112,14 @@ python -X utf8 tools/summarize_probe_log.py logs/probe.log > docs/probe-table.md
 ├─ CLAUDE.md                 # 작업 규칙·공모전 정보·진행 로그(§9) — 작업 시작 전에 먼저 읽기
 ├─ README.md
 ├─ app/src/main/java/com/teamsync/pleos/
+│  ├─ MainActivity.kt        # 홈 (DO 선언, 퍼미션 요청 → MonitorService 시작)
+│  ├─ ProbeActivity.kt       # SDK Probe (DO 미선언)
+│  ├─ core/                  # CarSession, VehicleMonitor, UxRestrictionsMonitor, NaviController, alert/(AlertCenter·Rules·Notifier)
+│  ├─ service/MonitorService.kt  # 상시 수신 Foreground Service (specialUse)
 │  ├─ log/AppLog.kt          # 공통 로그 래퍼 (logcat + filesDir/logs 롤링 파일 + 화면용 tail)
 │  ├─ vehicle/VehicleErrors.kt  # 난독화된 Vehicle 예외에서 ErrorCode 추출
 │  ├─ probe/                 # VehicleProbe(리플렉션 전수 호출), NaviProbe, PermissionReport, ViewModel
-│  └─ ui/ProbeScreen.kt      # Probe 화면 (Compose)
+│  └─ ui/                    # HomeScreen, OneLineAlertBar, ProbeScreen (Compose)
 ├─ docs/                     # 실측 결과, 결과표, 스크린샷
 ├─ tools/summarize_probe_log.py
 └─ apk/                      # 제출용 release APK 위치 (아직 없음)

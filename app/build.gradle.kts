@@ -7,6 +7,8 @@ plugins {
 android {
     namespace = "com.teamsync.pleos"
     compileSdk = 35
+    // CarUxRestrictionsManager 등 AAOS Car API (컴파일용 stub, 런타임은 기기 car framework apex)
+    useLibrary("android.car")
 
     defaultConfig {
         applicationId = "com.teamsync.pleos"
@@ -47,6 +49,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.process)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.tooling.preview)

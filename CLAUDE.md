@@ -196,10 +196,11 @@ dependencies {
 - 앱은 AAOS `CarUxRestrictionsManager.registerListener()` → `onUxRestrictionsChanged(CarUxRestrictions)`로 상태 수신, `isRequiresDistractionOptimization()` + `getActiveRestrictions()` 비트로 기능 제한 적용
 - **DO(Distraction Optimization) 미선언 앱은 주행 중 사용 불가** (주차 중만 가능). 주행 중 화면이 필요하면 DO 선언 + 제한 직접 처리
   - 실측: 에뮬레이터에서 **기어 D가 되는 즉시(0 km/h여도)** "주행 중에는 사용할 수 없습니다"로 차단. 차단 중에도 프로세스는 살아 있어 SDK 콜백은 계속 옴
-  - 실측: 앱이 백그라운드로 가면 ~10초 뒤 cached-app freezer가 프로세스를 얼려 SDK 콜백 수신 중단 → 백그라운드 감시는 Foreground Service 필요
-  - DO 선언 방식: AAOS 표준은 Activity에 `<meta-data android:name="distractionOptimized" android:value="true"/>` — Pleos 문서에서 동일 여부 **확인 필요**
-  - CarUxRestrictionsManager 사용 시 `android { useLibrary("android.car") }` 필요 여부 **확인 필요**
-- 주행 중 제한(한국 = "그외 지역" 추정): 미디어 로그인/설정/검색, 차량 설정(도어·시트), 동영상, QR 로그인, 대용량 텍스트 ⛔ / 키보드·다이얼패드·검색·내비 검색은 허용 표기 (단, 디자인 가이드는 주행 중 키보드 입력 지양)
+  - 실측: 앱이 백그라운드로 가면 ~10초 뒤 cached-app freezer가 프로세스를 얼려 SDK 콜백 수신 중단 → 백그라운드 감시는 Foreground Service 필요 → **구현·검증 완료** (`MonitorService`, type=specialUse, 백그라운드 36초에도 `curProcState=4`, freeze 없음)
+  - DO 선언: 홈(`MainActivity`)에 `<meta-data android:name="distractionOptimized" android:value="true"/>` 선언함. **실측: 사이드로드 앱은 인정 안 됨** — `CarPackageManager.isActivityDistractionOptimized=false`, Pleos 홈 화면이 앱 영역에 차단 오버레이. 에뮬레이터엔 앱마켓 없음(허용 목록=서명 일치 시스템 앱). 마켓 설치 시 인정되는지 [미검증] → 설명회 질문 ⑥
+  - 실측: **서드파티 heads-up 미표시** — Pleos `NOTIFICATION_INJECTOR`가 privileged/platformSigned 아니면 띄우지 않음 → 설명회 질문 ⑦. 결국 에뮬레이터에선 D 동안 서드파티 앱이 운전자에게 보여줄 경로가 없음 (`docs/common-foundation.md` §3)
+  - `useLibrary("android.car")`로 컴파일(런타임은 기기 car framework apex에 있어 `<uses-library>` 불필요) — 적용됨
+- 주행 중 제한(한국 = "그외 지역", **실측 일치: D/N에서 `0x50 NO_VIDEO|NO_SETUP`**): 미디어 로그인/설정/검색, 차량 설정(도어·시트), 동영상, QR 로그인, 대용량 텍스트 ⛔ / 키보드·다이얼패드·검색·내비 검색은 허용 표기 (단, 디자인 가이드는 주행 중 키보드 입력 지양)
 - 플래그: NO_DIALPAD(1), NO_FILTERING(2), LIMIT_STRING_LENGTH(4), NO_KEYBOARD(8), NO_VIDEO(16), LIMIT_CONTENT(32), NO_SETUP(64)
 - 디자인 원칙: 첫 화면에 핵심 기능, 얕은 메뉴, 큰 터치 타깃, 고대비, 최소 텍스트, 자동 애니메이션 최소화, 게임·웹서핑 유도 금지
 - **앱 카테고리: Mobility Services** 권장 — 주행 중 "차량 관리 서비스, 현재 위치 기반 즉각 정보, 전기차 충전소 찾기 및 경유지 설정, 주유소/주차장 탐색"이 제한적으로 허용됨
@@ -230,6 +231,8 @@ dependencies {
 ├─ README.md            # 심사용: 앱 이름·한 줄 소개 / 실행 방법 / 테스트 환경 / APK 위치 + 다른 PC 셋업 절차
 ├─ apk/                 # 팀명_앱이름_release.apk
 ├─ app/                 # Android 앱 모듈 (Kotlin+Compose, minSdk 28, targetSdk 34, compileSdk 35, 패키지 com.teamsync.pleos)
+│                       #   core/(CarSession·VehicleMonitor·UxRestrictionsMonitor·NaviController·alert/), service/MonitorService,
+│                       #   MainActivity=홈(DO), ProbeActivity=SDK Probe, probe/, log/AppLog
 ├─ docs/                # SDK 실측 결과(sdk-probe-results.md, probe-table.md), 기획서 초안, 시연 시나리오
 ├─ tools/               # summarize_probe_log.py (Probe 로그 → 결과표)
 └─ logs/                # adb로 꺼낸 로그 (gitignore)
@@ -245,7 +248,8 @@ dependencies {
 
 - [ ] **M0 (~10/26)** ~~에뮬레이터 + Virtual Console 구동~~ ✅ / ~~빈 프로젝트에 Vehicle·NaviHelper 의존성 추가 후 빌드 성공~~ ✅ (10/22) / Playground 가입·프로젝트 생성 ⬜ (사람이 직접)
 - [ ] **M1 (~10/27) SDK Probe 화면**: ~~전 도메인 Capability/Get/Callback + NaviHelper 이벤트 실시간 표시·로그~~ ✅ / ~~Virtual Console 조작 시 값 변화 확인, 사용 가능 데이터 목록 기록~~ ✅ (10/22, `docs/sdk-probe-results.md`) / **아이디어 확정 ⬜**
-- [ ] 10/28 설명회 질문: ① 준비 중 SDK 공모 기간 내 오픈 여부 ② 표준 Android API(TTS/위치) 대체 시 기술 활용성 인정 여부 ③ PT 시연 장비(본인 노트북+에뮬레이터 OK?) ④ **`PRIVATE_CAR_SAFETY`(경고등·타이어)·`PRIVATE_CAR_INFO`를 3rd-party 앱이 써도 되는지** (에뮬레이터에선 normal로 부여됨) ⑤ 차량용 앱의 Foreground Service 허용 여부·타입 ⑥ DO 선언 방식(`distractionOptimized` meta-data) 확인
+- [ ] 10/28 설명회 질문: ① 준비 중 SDK 공모 기간 내 오픈 여부 ② 표준 Android API(TTS/위치) 대체 시 기술 활용성 인정 여부 ③ PT 시연 장비(본인 노트북+에뮬레이터 OK?) ④ **`PRIVATE_CAR_SAFETY`(경고등·타이어)·`PRIVATE_CAR_INFO`를 3rd-party 앱이 써도 되는지** (에뮬레이터에선 normal로 부여됨) ⑤ 차량용 앱의 Foreground Service 허용 여부·타입 (현재 `specialUse`) ⑥ **DO 인정 방식** — 매니페스트 meta-data를 넣었지만 사이드로드 앱은 `isActivityDistractionOptimized=false`. 마켓 설치 시 인정? 에뮬레이터에서 DO 앱을 시연·테스트하는 방법? ⑦ **서드파티 앱의 주행 중 알림(heads-up) 표시 방법** (현재 Pleos가 비권한 앱 HUN을 띄우지 않음) ⑧ Vehicle SDK 퍼미션 **사전 승인 절차** (심사 기준: 승인 안 된 퍼미션 선언 시 탈락)
+- [x] **공통 기반 (10/22)**: FGS 상시 수신 / CarUxRestrictions 구독 + 주행·정차 레이아웃 / 1줄 알림(앱 내 바 + heads-up 게시) / NaviHelper 경유지 래퍼 — `docs/common-foundation.md`, 브랜치 `feat/common-foundation`
 - [ ] **M2 (~11/10)** 핵심 기능 1~2개 실제 동작 + CarUxRestrictions 처리
 - [ ] **M3 (~11/14)** release APK 빌드·서명, 블라인드 GitHub(Organization) 업로드, README, 시연 영상(에뮬레이터 화면녹화 + Virtual Console 조작), 기획서 작성(MAU·Retention 근거 포함)
 - [ ] **11/15 23:59 전 제출** (여유 있게 11/14 제출 목표), 숏폼은 시연 영상 재편집
@@ -265,6 +269,10 @@ dependencies {
 - 2026-10-22: GitHub Organization `SYNC-Dongihwa` 생성(사람), private repo `pleos-app`에 push. 커밋 identity는 repo-local 익명.
 - 2026-10-22: [실측] SOC 2%로 경로 요청 → 순정 내비가 "배터리 부족으로 충전소를 경유합니다"로 충전소 자동 경유(충전 6분, 도착 10%), SDK `onDrivingInfo.waypoints`에 `isChargingStation=true, maxChargingPower=100, chargerCount=4`로 들어옴(단 `isRecommendedChargingStation=false`, `chargingPlan=null`). 충전 스위치 On이어도 에뮬레이터 SOC는 자동 상승 안 함.
 - 2026-10-22: [실측] 경고등(ABS·EV시스템·저전압·엔진오일압) ON → 순정은 클러스터 아이콘만, 텍스트/팝업/알림 없음 (도어·트렁크 열림만 텍스트 팝업). Telltale `color`는 전부 4(매핑 불명). 앱이 freeze 중 받지 못한 Navi 이벤트는 전면 복귀 시 몰아서 도착. A/B 비교 → `docs/idea-comparison.md`.
+- 2026-10-22: 공통 기반 구현·검증 (`docs/common-foundation.md`). FGS(specialUse)로 내비 전면 36초+ 동안 freeze 없이 수신 ✅ / 주행 규제 구독·주행 레이아웃 전환 ✅ / 앱 내 1줄 알림 바 ✅ / 경유지 래퍼(경로→추가×2→제거→전체제거→취소) ✅.
+- 2026-10-22: [제약] DO meta-data 선언해도 사이드로드 앱은 `isActivityDistractionOptimized=false` → D에서 Pleos 홈이 오버레이로 가림. 서드파티 heads-up은 Pleos `NOTIFICATION_INJECTOR`가 privileged/platformSigned 아니면 미표시. → 에뮬레이터에선 주행 중 표시 경로 없음, 시연은 정차 화면 중심.
+- 2026-10-22: [SDK 규칙] 같은 속성 리스너 하나를 unregister하면 앱 전체 구독이 서비스에서 삭제됨(참조 카운트 없음, 다른 Vehicle 인스턴스 포함) → **속성당 등록 주체는 VehicleMonitor 하나**, Probe는 세션 인스턴스를 빌리고 해제 후 `resubscribe()`. addWaypoint/removeWaypoint는 `onRouteCancelled`→FREE_DRIVE→(~6초)→`onWaypointChanged`→ROUTE_DRIVE 순서, `onWaypointChanged.index`는 다음 경유지(추가한 슬롯 아님).
+- 2026-10-22: [심사 가이드 확인] Vehicle SDK 퍼미션은 앱마켓 사전 승인된 것만 선언 가능(아니면 탈락), 테스트용 더미 데이터 금지(개발자 도구는 debug 빌드 전용으로 처리), 미디어 앱 heads-up 금지·운전 무관 알림 금지.
 
 ---
 

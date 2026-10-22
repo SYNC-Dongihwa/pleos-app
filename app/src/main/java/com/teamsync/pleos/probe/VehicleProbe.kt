@@ -40,9 +40,18 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * set/move/select(제어 계열)는 호출하지 않는다 — Vehicle Control SDK는 준비 중이고 Probe는 읽기 전용.
  */
-class VehicleProbe(context: Context, private val scope: CoroutineScope) {
+class VehicleProbe(
+    context: Context,
+    private val scope: CoroutineScope,
+    shared: Vehicle? = null,
+    /** 리스너를 해제한 직후 호출 — 같은 속성을 구독하던 앱의 다른 곳이 재구독해야 한다 (VehicleMonitor.resubscribe). */
+    private val onListenersRemoved: () -> Unit = {},
+) {
 
-    private val vehicle = Vehicle(context.applicationContext)
+    // 같은 프로세스에서 Vehicle 인스턴스를 따로 만들어 release하면 다른 인스턴스(CarSession)의 콜백까지 끊긴다 (실측)
+    // → MonitorService가 떠 있으면 그 인스턴스를 빌려 쓰고 release하지 않는다
+    private val vehicle = shared ?: Vehicle(context.applicationContext)
+    private val ownsVehicle = shared == null
 
     private val _rows = MutableStateFlow<Map<String, ProbeRow>>(emptyMap())
     val rows: StateFlow<Map<String, ProbeRow>> = _rows.asStateFlow()
@@ -65,6 +74,11 @@ class VehicleProbe(context: Context, private val scope: CoroutineScope) {
     @Volatile private var generation = 0
 
     fun start() {
+        if (!initialized && !ownsVehicle) {
+            AppLog.i(TAG, "using shared Vehicle instance (CarSession)")
+            initialized = true
+            _state.value = "INITIALIZED (shared)"
+        }
         if (!initialized) {
             AppLog.i(TAG, "initialize() call")
             try {
@@ -89,7 +103,7 @@ class VehicleProbe(context: Context, private val scope: CoroutineScope) {
         unregisterAll()
         val pending = pendingCallbacks.get()
         if (pending > 0) AppLog.w(TAG, "release() while $pending callbacks still pending")
-        if (initialized) {
+        if (initialized && ownsVehicle) {
             try {
                 vehicle.release()
                 AppLog.i(TAG, "release() ok")
@@ -249,6 +263,7 @@ class VehicleProbe(context: Context, private val scope: CoroutineScope) {
         }
         AppLog.i(TAG, "unregistered $ok/${registrations.size} listeners")
         registrations.clear()
+        onListenersRemoved()
     }
 
     // ---- 결과 처리 --------------------------------------------------------------------------
