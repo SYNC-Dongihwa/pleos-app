@@ -214,6 +214,7 @@ dependencies {
 > **3차 브레인스토밍 (공모전 8개 이동 순간별 21안, 특이·괴상 포함, 실현성·시연 가능성 태그): [docs/idea-brainstorm-3.md](docs/idea-brainstorm-3.md)** — 의외의 강자: P1 지하 주차 층수 추정(조향각), E1 충전기 실측 속도 기록, F1 좌석별 멀미 지수, X1 차가 쓰는 일기.
 > **4차 "혁신 유형"별 15안 (차=센서/플랫폼/새 조작/신뢰·경제/공간/예측): [docs/idea-brainstorm-4.md](docs/idea-brainstorm-4.md)** — 혁신 후보: G1 카 숏컷(차량 이벤트 자동화 플랫폼), S1 와이퍼 기상청, I1 동승자 코파일럿, P1 심부름 자동 끼워넣기.
 > **가족 + 반려동물 조합 7안: [docs/idea-family-pet.md](docs/idea-family-pet.md)** — 추천: 야간 응급 이동 버튼(아이·반려동물, requestTrip으로 실제 ETA 비교), 목적지 반려동물 동반 자동 확인, 조수석 에어백 경고 → 묶음 "펫밀리 모드".
+> **펫밀리 모드 확장 18안 + MVP 구성: [docs/idea-petmily.md](docs/idea-petmily.md)** — MVP(외부 데이터 없이): 출발 전 체크(창문 잠금·에어백·견종 온도), 리드줄 하차 가드, 휴게소 롤콜, 마지막 하차 지점 기록, 주행 기록→정차 시 요약.
 > **실측 기반 비교: [docs/idea-comparison.md](docs/idea-comparison.md) (2026-10-22)** — A의 핵심(도착 잔량·충전소 자동 경유)은 순정 내비가 이미 함 / B는 순정이 아이콘만 표시(빈틈 확인), 단 `PRIVATE_CAR_SAFETY` 허용이 조건. 잠정: 10/28 확인 후 허용→B(B1+B2+B4), 불허→A(A1 충전 정차 코파일럿+A2 내 조건 충전소 재선택).
 
 선정 기준: 지금 사용 가능한 SDK(Vehicle State + NaviHelper)만으로 핵심 기능 구현 가능 / 차량 없으면 의미 없는 기능 / Mobility Services 카테고리 / 수익모델 설명 가능.
