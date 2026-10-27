@@ -188,6 +188,18 @@ class TutorialEngineTest {
         assertEquals(Mode.Finished, engine.state.mode)
     }
 
+    @Test fun `다시 해보기 도중 그만두면 이전 결과가 남는다`() {
+        engine.start(true, now)
+        change(VehicleSignal.LOW_BEAM, "OFF", "ON")
+        change(VehicleSignal.LOW_BEAM, "ON", "OFF")
+        val before = engine.state.results["light"]
+        engine.skip(now)
+        assertEquals(Mode.Finished, engine.state.mode)
+        engine.retry("light", now)
+        engine.quit()
+        assertEquals(before, engine.state.results["light"])
+    }
+
     @Test fun `이어서 하기는 결과가 없는 단계부터`() {
         engine.restore(mapOf("light" to StepResult(Outcome.COMPLETED, "OFF → ON, ON → OFF")))
         engine.start(fromBeginning = false, now)

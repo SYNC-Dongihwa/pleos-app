@@ -101,7 +101,8 @@ class TutorialEngine(
             log('W', "retry ignored id=$stepId parked=${state.parked}")
             return@effects
         }
-        state = state.copy(mode = Mode.Running, singleStep = true, results = state.results - stepId, lastCompleted = null)
+        // 이전 결과는 새 결과가 기록될 때까지 유지 — 다시 해보기 도중 그만두면 원래 결과가 남는다 (10-27 화면 확인 중 발견)
+        state = state.copy(mode = Mode.Running, singleStep = true, lastCompleted = null)
         log('I', "RETRY $stepId")
         prefix = ""
         enter(index, now)
