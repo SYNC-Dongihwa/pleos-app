@@ -4,11 +4,13 @@
 > 블라인드 심사용 repo → 어디에도 실명·소속·개인 계정 정보 금지. 공모전 규정·제출 형식: [docs/contest-guide.md](docs/contest-guide.md). 이전 기록: [docs/history-2026-10.md](docs/history-2026-10.md).
 
 ## 1. 한 줄 요약
-처음 타는 차에서 비상등·전조등·와이퍼 같은 기능을 직접 조작하면, **Vehicle SDK의 실제 상태 변화로** 조작 완료를 확인해 주는 인터랙티브 튜토리얼. 정차 중(기어 P)에만 진행, 화면 + Pleos TTS 음성 안내.
-사용 장면: 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허 운전자.
+처음 타는 차에서 주유구·전조등·김서림 같은 기능을 직접 조작하면, **Vehicle SDK의 실제 상태 변화로** 조작 완료를 확인해 주는 인터랙티브 튜토리얼. 정차 중(기어 P)에만 진행, 화면 + Pleos TTS 음성 안내. **상황별 코스 5개(+전체, 24단계)**.
+출발점(사용자 경험): 친구가 신형 쏘나타를 샀는데 주유구 여는 방식이 예전 차와 달라 주유소에서 못 열었음 → 기본 조작뿐 아니라 "필요한 순간에야 찾는" 기능(주유구·보닛·김서림·창문 잠금 등)을 미리 연습. 사용 장면: 차를 바꾼 직후, 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허.
 
 ## 2. 현재 상태
 - **Phase 1·2·3 완료 10-27** (Phase 3: 오프닝·release 서명·시연 시나리오·README, STT는 선택이라 보류). `feat/car-tutorial`을 10-27 `main`에 fast-forward 병합 → 작업 기준은 `main`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
+  - **상황별 코스 (10-27, 브랜치 `feat/tutorial-courses`)**: 기본 조작 8 · 주유·충전 3(주유구=AAOS `FUEL_DOOR_OPEN`, 충전구=AAOS `EV_CHARGE_PORT_OPEN`, 보닛) · 비·김서림 4 · 추위·공조 6 · 아이·야간 3 + 전체. 엔진은 코스 순서(`order`)로 진행, 결과는 단계 id로 공유, 코스를 처음부터 하면 그 코스 결과만 지움. 홈 = 코스 카드(진행·이 차 미지원 수). 신호 25개(Pleos 23 + AAOS 2).
+  - 검증(debug, 콘솔): `FINISH course=fuel [COMPLETED=2, UNSUPPORTED=1]`(주유구 `AAOS FUEL_DOOR_OPEN 속성 없음` → 충전구·보닛 완료) · weather 4/4 · climate 6/6 · family 3/3(창문 잠금 Area 수정 후). 기본 조작 7 + 미지원 1 → 전 코스 완료로 `master=true`. 단위 테스트 36개.
   - 오프닝: `opening/OpeningDirector` — 첫 실행 또는 홈·튜토리얼 시작 전에 운전석 문 0→1(콜백, 60초 쿨다운) → 환영 화면·음성 → 시작하기. 실내등은 `CONTROL_CAR_LIGHTS` 부여 시에만 `flashCabinLight`(capability 쓰기 확인 → 원래 값 get → ON → 4초 뒤 복구).
   - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **APK는 아직 커밋 안 함** — 제출 직전 최종본만 커밋(41MB, 이력 비대 방지). 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
   - 시연: `docs/demo-scenario.md` + `tools/vc-demo.js`(`__demo.reset/door/run`) — release APK로 11단계 완주 2분 10초 실측.
@@ -71,6 +73,10 @@ SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기
 | 10-27 | APK 파일명 `SYNC_MyCarTutorial_release.apk` (팀명 SYNC) | 규정 `팀명_앱이름_release.apk`, 한글 파일명 도구 호환 문제 회피. 바꾸려면 README·demo 문서 링크도 수정 |
 | 10-27 | release 축소·난독화 끔, v1·v2·v3 서명 설정 (AGP가 minSdk 28이라 v3만 넣음) | VehicleErrors가 SDK 예외를 리플렉션으로 읽음. Pleos 요구 = v3 |
 | 10-27 | 다시 해보기는 새 결과가 기록될 때까지 이전 결과 유지 | README 화면 캡처 중 발견: 다시 해보기 → 그만하기 시 완료 결과가 지워짐 → 수정·단위 테스트·에뮬레이터 확인 |
+| 10-27 | 상황별 코스 + 기능 13개 추가 (사용자 선택) | 주유구 경험에서 출발: 필요한 상황만 바로 연습. 한 줄 24단계는 너무 김 |
+| 10-27 | 주유구·충전구는 AAOS `FUEL_DOOR_OPEN`·`EV_CHARGE_PORT_OPEN` (퍼미션 `CAR_ENERGY_PORTS`) | Pleos Fuel 도메인에 주유구 API 없음, Pleos `EvChargePortOpen`은 deprecated(→ Google 속성). 전기차는 주유구가 자동 '지원 안 됨' → 충전구로 |
+| 10-27 | 창문 잠금은 뒷좌석을 포함하는 **가장 넓은** Area(전체 창문 묶음) 구독 | 단독 ROW_2_LEFT로 구독하면 묶음 Area(1360) 이벤트가 걸러짐 (§7-16). 실제 버튼도 전체 잠금 |
+| 10-27 | 결과 화면의 '지원 안 됨' 사유는 사용자 말로, 원문은 개발자 패널·로그 | capability 오류 원문은 운전자에게 의미 없음 |
 | 10-27 | STT 음성 명령 보류 | 선택 항목, 마이크·STT 퍼미션 승인 필요·미실측. 핵심 흐름에 영향 없음 |
 
 ## 4. SDK 메모 (출처 + 실측)
@@ -97,6 +103,14 @@ SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기
 | 트렁크 / 운전석 문 | `registerDoorPosition(DoorArea(REAR) / (ROW_1_LEFT), DoorPositionListener)` → `onPositionUpdated(Int?)` | `CAR_DOORS` | R door | 트렁크 0..100, 도어 0..1 · Trunk, Door Position |
 | 주행 모드 | `DrivingMode.registerDrivingModeState` → `onDrivingModeStateUpdated(DrivingModeType?)` {NORMAL, ECO, SPORT}, set 없음 | `CAR_DRIVE` | R driving-mode | **에뮬레이터 미지원** (`ERROR_NOT_SUPPORTED_PROPERTY`) · 카드 없음 |
 | 정차 판정 보조 | AAOS `CarUxRestrictionsManager` (`useLibrary("android.car")`) | 없음 | driving-restriction-development-guide | P: DO 불필요 / D·N: `0x50` |
+| 주유구 / 충전구 | AAOS `FUEL_DOOR_OPEN` / `EV_CHARGE_PORT_OPEN` (Boolean, area 0) — `getCarPropertyConfig`가 null이면 미지원 | `android.car.permission.CAR_ENERGY_PORTS` (normal) | pleos-connect-sdk-api 정책 | 주유구 **config 없음**(EV) / 충전구 false→true→false · Charge Port |
+| 보닛 | `Door.registerDoorPosition(DoorArea(HOOD))` 0..100 | `CAR_DOORS` | R door | 0→100→0 · Trunk/Frunk(**frunk**) |
+| 김서림·뒷유리 열선 | `HVAC.registerHvacDefrosterState(WindowArea(FRONT/REAR_WINDSHIELD), HvacDefrosterStateListener)` Boolean | `CAR_CLIMATE` | R h-v-a-c | OK · Defroster(front/rear) |
+| 뒷유리 와이퍼 | `registerWiperState(WindowArea(REAR_WINDSHIELD))` | `CAR_WINDOWS` | R wiper | OK · Wiper Switch(rear) |
+| 내기 순환 / 오토 / 바람 | `registerHvacRecirculationState`(리스너 메서드 `onHvacAutoRecirculationStateUpdated`) / `registerHvacAutoState` / `registerHvacFanSpeed` 1..8 | `CAR_CLIMATE` | R h-v-a-c | OK · Air Recirculation / HVAC Auto / Fan Speed(0..8) |
+| 시트 열선 | `Seat.registerHvacSeatTemperature(SeatArea(ROW_1_LEFT), HvacSeatTemperatureListener)` **-3..3(음수=통풍)** | **`CAR_SEATS`** | R seat | 0→2→0 · Seat Temperature(V3..H3) |
+| 창문 잠금 | `Window.registerWindowLockState(WindowArea(묶음), WindowLockStateListener)` | `CAR_WINDOWS` | R window | 묶음 Area만 이벤트 · Window Lock(**all**) |
+| 실내등 / 독서등 | `Light.registerCabinLightState` / `registerReadingLightState(SeatArea(ROW_2_LEFT))` LightState | `CAR_LIGHTS` | R light | OK (에뮬레이터 연동 이슈 §7-17) · Cabin Lights / Reading Lights |
 
 **TTS (TTS 문서, 3.3.1)**: `TextToSpeech(context, Mode.ON_DEVICE)` → `initialize(OnInitializeListener{onSuccess; onFailure(ErrorType)})` → `addEventListener(EventListener{onReady,onStart,onDone,onStop,onError,onUpdatedRms})` → `setLocale` → `speak(text, isFinal)` / `stop()` / `release()`. ON_DEVICE는 앱 등록·네트워크 불필요. 실측 규칙은 §6.
 **STT (Phase 3 선택)**: `ai.pleos.playground:SpeechToText:3.3.1`, CaaS에 온디바이스 구현 있음 — **미실측**, 필요 퍼미션 미확인.
@@ -111,6 +125,8 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 - [ ] `pleos.car.permission.CAR_DRIVE` — 주행 모드
 - [ ] `pleos.car.permission.TTS_SERVICE` — 음성 안내 (SDK `ApiChecker`가 확인, 없으면 SecurityException [실측])
 - [ ] `android.car.permission.CAR_POWERTRAIN` — AAOS 기어·주차 브레이크 (AAOS 표준 퍼미션, 사전 승인 대상인지 **미확인**)
+- [ ] `pleos.car.permission.CAR_SEATS` — 시트 열선 (10-27 추가)
+- [ ] `android.car.permission.CAR_ENERGY_PORTS` — AAOS 주유구·충전구 (10-27 추가, AAOS 표준 퍼미션 사전 승인 대상인지 미확인)
 - [ ] (Phase 3 선택) `pleos.car.permission.CONTROL_CAR_LIGHTS` — 오프닝 조명
 - [ ] (Phase 3 선택) STT 퍼미션 + `android.permission.RECORD_AUDIO` — 음성 명령 (미확인)
 - Phase 1에서 **제거 완료**: `CAR_ENERGY, CAR_INFO, CAR_MIRRORS, CAR_SAFETY, CAR_SEATS, CAR_TOLL, PRIVATE_CAR_INFO, PRIVATE_CAR_SAFETY, NAVI_ROUTE, NAVI_ROUTE_SEARCH`, `android.car.permission.CAR_SPEED`, `CAR_EXTERIOR_ENVIRONMENT`, `FOREGROUND_SERVICE*`, `POST_NOTIFICATIONS`
@@ -144,6 +160,9 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 13. 콘솔 "Trunk / Frunk Position" 기본 선택은 frunk(=HOOD) → trunk를 고르지 않으면 `TRUNK` 신호가 안 바뀜. 콘솔 카드 라벨(예: Gear Selection의 "Park")은 갱신이 늦을 수 있어 실제 반영은 로그로 확인.
 14. Compose Material3 버튼에 `contentColor`를 안 주면 `darkColorScheme().onPrimary`(어두운 보라)가 글자색 → 파란 배경에서 안 읽힘. `BigButton`은 흰색 지정 (10-27 화면 확인).
 15. Pleos TTS `stop()` 직후 `speak()`해도 새 안내는 정상 재생 (로그 `event onStop` → `onReady` → `onStart`, 10-27).
+16. 창문 잠금: 콘솔 Window Lock(all)은 `WINDOW_LOCK areaId=1360`(전체 묶음)으로 발행, 단독 ROW_2_LEFT 구독은 SDK가 걸러 콜백 없음. rear_left 선택은 이벤트 자체가 없음 (로그 `[Pleos][SDK]a onChangeEvent … areaId = 1360`, 10-27).
+17. 에뮬레이터: 콘솔 실내등 On 시 뒷좌석 독서등도 ON, 독서등 카드 On/Off 반영이 엇갈려 보임 → 앱은 시작 시점 값 기준 전이로 판정해 진행에 문제없음. `FUEL_DOOR_OPEN`은 config 자체가 없음(EV).
+18. 콘솔 버튼을 눌러도 가끔 발행되지 않는다 (10-27: 기본 조작 첫 Low beam 클릭 때 Vehicle 서비스 로그 `LOW_BEAM_LIGHTS_STATE` 0건, 다시 누르니 정상). 앱이 안 넘어가면 먼저 `adb logcat | grep "[Pleos]u"`로 서비스에 이벤트가 왔는지 확인.
 - 10/28 설명회 질문: ① `android.car.permission.CAR_POWERTRAIN` 등 AAOS 표준 퍼미션도 사전 승인 대상인지 ② TTS·STT 사용 허용·`TTS_SERVICE` 승인 ③ `CONTROL_CAR_LIGHTS` 승인 가능성 ④ 퍼미션 사전 승인 신청 절차 ⑤ PT 시연 장비(노트북+에뮬레이터) ⑥ DO 인정 방식(사이드로드 미인정).
 
 ## 8. 금지 사항
