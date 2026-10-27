@@ -8,10 +8,24 @@
 사용 장면: 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허 운전자.
 
 ## 2. 현재 상태
-- **Phase 1 (기반) 완료 2026-10-27**, 브랜치 `feat/car-tutorial`. 이전 앱(Probe·FGS·내비·알림)은 태그 `archive/pleos-probe-2026-10-22`.
-  - 구성: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(Pleos 신호 11개 + 주행 모드) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate`(순수 함수, 단위 테스트) · 홈(게이트·지원 목록) · 숨김 개발자 패널(제목 5탭).
-- **다음 할 일 (Phase 2 — 튜토리얼 엔진·UI)**: 단계 정의 데이터 분리 → 상태 전이 판정·20초 힌트·건너뛰기·미지원 자동 처리·원복 확인 → TTS(`voice/SpeechGuide`)·주행 전환 일시정지·완료 화면·DataStore 진행 저장. 완료 기준: 콘솔만으로 전 단계 완주 + 판정 근거 로그.
-- 일정: Phase 1~2 → 11/7, Phase 3 → 11/13, 접수 마감 11/15 23:59. 10/28 설명회 질문은 §7 끝.
+- **Phase 1 (기반) 완료 10-27 · Phase 2 (튜토리얼 엔진·UI) 완료 10-27**, 브랜치 `feat/car-tutorial`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
+  - 기반: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(신호 12개, `state` + 합쳐지지 않는 `changes`) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate` · 숨김 개발자 패널(제목 5탭).
+  - 튜토리얼: `tutorial/TutorialSteps`(단계 = 데이터, 11단계) → `TutorialEngine`(순수 Kotlin 상태 기계, 효과 Speak/Log/Save 반환) → `TutorialController`(단일 스레드, 정차 복귀 800ms 디바운스, 1초 tick) · `ProgressStore`(DataStore) · `voice/SpeechGuide`(Pleos TTS, 새 안내가 이전 안내를 끊음) · 화면 `TutorialScreen`/`FinishScreen`/`HomeScreen`.
+- **다음 할 일 (Phase 3 — 시연·제출)**: "새 차 첫날" 오프닝(운전석 문 열림 → 환영 음성, 조명 연출은 `CONTROL_CAR_LIGHTS` 승인 시에만) → (선택) STT 다음/다시/건너뛰기 → README·서명 APK(`apk/팀명_앱이름_release.apk`) → 시연 영상용 콘솔 시나리오.
+- 일정: Phase 3 → 11/13, 접수 마감 11/15 23:59. 10/28 설명회 질문은 §7 끝.
+
+**Phase 2 검증 (10-27)** — 콘솔만으로 11단계 완주: 완료 10 · 미지원 1(주행 모드) · 배지 "내 차 마스터". 단위 테스트 24개 통과(엔진 15). 그 밖에 확인: 20초 힌트, D 전환 즉시 일시정지 + 음성, 멈춘 동안 변화 무시, P 복귀 0.8초 뒤 재개, 건너뛰기, 강제 종료 후 "이어서 하기 (2 / 11)".
+```
+SYNC/Tutorial: STEP low_beam start original=OFF (꺼짐) goal='원래 값에서 바뀜'
+SYNC/Tutorial: JUDGE low_beam phase=1/2 goal='원래 값에서 바뀜' original=OFF phaseStart=OFF OFF→ON (live) → 충족
+SYNC/Tutorial: JUDGE low_beam phase=2/2 goal='원래 값으로 돌아옴' original=OFF phaseStart=ON ON→OFF (live) → 충족
+SYNC/Tutorial: JUDGE driver_temperature phase=1/2 goal='1.0 이상 감소' original=22.0 phaseStart=22.0 22.0→21.5 (live) → 미충족
+SYNC/Tutorial: HINT driver_temperature phase=1 after 20s without change
+SYNC/Gate: gate → NotParked(기어 D) → SYNC/Tutorial: PAUSE … → CHANGE 21.5→21.0 ignored (paused) → (P) RESUME
+SYNC/Tutorial: STEP driving_mode UNSUPPORTED: checkDrivingModeStateCapabilities: errorCode=ERROR_NOT_SUPPORTED_PROPERTY
+SYNC/Tutorial: FINISH [COMPLETED=10, SKIPPED=0, UNSUPPORTED=1] master=true
+```
+- 콘솔 조작 순서는 README "Virtual Console로 전 단계 완주". 미확인: 실제 스피커 소리(AudioTrack 기록까지만 확인), 재개 시 새 기준값 적용(단위 테스트만), 완료 화면 "다시 해보기"(단위 테스트만).
 
 **Phase 1 검증 (10-27, 에뮬레이터 + Virtual Console)** — 콘솔 조작마다 개발자 패널 값과 로그가 1초 안에 바뀜. 실행 직후 capability 11개 성공·주행 모드만 `ERROR_NOT_SUPPORTED_PROPERTY`로 '지원 안 됨'. 단위 테스트 9개 통과.
 ```
@@ -36,6 +50,10 @@ SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기
 | 10-27 | Logger 태그 `PLEOS/` → `SYNC/` | 요구사항 |
 | 10-27 | FGS·NaviHelper·알림·Probe 제거 (git 태그로 보존) | 튜토리얼은 앞화면 전용. 미사용 퍼미션 = 심사 반려 |
 | 10-27 | 완료 판정 = 콜백 상태 전이만, 기준값은 get으로 확보 | 타이머·버튼 완료 금지. register 직후 초기값이 안 오는 속성 있음 |
+| 10-27 | 단계 문구는 시작 시점 값(original)으로 고름 (이미 켜져 있으면 "꺼 보세요" → "다시 켜 주세요") | 어떤 상태에서 시작해도 전이 + 원복을 관찰할 수 있게 |
+| 10-27 | 일시정지는 즉시, 재개는 P 상태가 800ms 유지될 때. 재개 시 phase 기준값을 현재 값으로 다시 잡음 | §7-12 깜빡임 방지. "1도 내려 보세요"는 재개 시점부터 (원복 목표는 original 기준이라 영향 없음) |
+| 10-27 | 창문 1단계 = 방향 무관 2 이상 움직임 | 문서에 값 의미(0=닫힘) 없음. 실측상 0=닫힘으로 보이나 확정 아님 |
+| 10-27 | 배지 = 지원되는 단계를 모두 완료 (미지원은 감점 아님, 건너뜀이 있으면 없음) | 차종별 지원 차이를 사용자 탓으로 돌리지 않음 |
 
 ## 4. SDK 메모 (출처 + 실측)
 출처 약어: **R** = `https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle/ai.pleos.playground.vehicle.api` (각 도메인 `/<domain>/entry`), **V** = `.../Vehicle/intro`, **E** = `.../Vehicle/vehicle-error-code`, **P** = `.../Vehicle/vehicle-permission`, **TTS** = `https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/TextToSpeech/intro`. 시그니처는 AAR(`Vehicle-2.3.2.aar` javap)로 대조함. [실측] = Pleos Connect Emulator 2.1.0 + Virtual Console.
@@ -104,6 +122,8 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 11. 앱이 백그라운드로 가면 ~10초 뒤 freezer로 콜백 끊김 (튜토리얼은 앞화면 전용이라 FGS 안 씀).
 12. D→P 복귀 시 `GEAR_SELECTION=P`가 주행 규제 해제보다 ~6ms 먼저 와서 게이트가 잠깐 `NotParked(주행 규제 중)`를 거친 뒤 `Parked` (로그 10-27 18:50:42.017~.024) → Phase 2 일시정지/재개 판정은 짧게 디바운스.
 13. 콘솔 "Trunk / Frunk Position" 기본 선택은 frunk(=HOOD) → trunk를 고르지 않으면 `TRUNK` 신호가 안 바뀜. 콘솔 카드 라벨(예: Gear Selection의 "Park")은 갱신이 늦을 수 있어 실제 반영은 로그로 확인.
+14. Compose Material3 버튼에 `contentColor`를 안 주면 `darkColorScheme().onPrimary`(어두운 보라)가 글자색 → 파란 배경에서 안 읽힘. `BigButton`은 흰색 지정 (10-27 화면 확인).
+15. Pleos TTS `stop()` 직후 `speak()`해도 새 안내는 정상 재생 (로그 `event onStop` → `onReady` → `onStart`, 10-27).
 - 10/28 설명회 질문: ① `android.car.permission.CAR_POWERTRAIN` 등 AAOS 표준 퍼미션도 사전 승인 대상인지 ② TTS·STT 사용 허용·`TTS_SERVICE` 승인 ③ `CONTROL_CAR_LIGHTS` 승인 가능성 ④ 퍼미션 사전 승인 신청 절차 ⑤ PT 시연 장비(노트북+에뮬레이터) ⑥ DO 인정 방식(사이드로드 미인정).
 
 ## 8. 금지 사항
