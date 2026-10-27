@@ -35,6 +35,7 @@ import com.teamsync.pleos.voice.SpeechGuide
 fun TutorialScreen(
     state: TutorialState,
     steps: List<TutorialStep>,
+    courseTitle: String?,
     speech: SpeechGuide.Status,
     onSkip: () -> Unit,
     onRepeat: () -> Unit,
@@ -45,7 +46,11 @@ fun TutorialScreen(
         Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${(state.stepIndex + 1).coerceAtMost(steps.size)} / ${steps.size}" + (step?.let { "  ·  ${it.title}" } ?: ""),
+                    listOfNotNull(
+                        if (state.singleStep) null else "${(state.coursePos + 1).coerceAtMost(state.courseSize)} / ${state.courseSize}",
+                        courseTitle,
+                        step?.title,
+                    ).joinToString("  ·  "),
                     fontSize = 30.sp, color = Dim, modifier = Modifier.weight(1f),
                 )
                 if (state.singleStep) Text("다시 해보기", fontSize = 24.sp, color = Warn)

@@ -21,34 +21,42 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.teamsync.pleos.tutorial.Course
 import com.teamsync.pleos.tutorial.Outcome
 import com.teamsync.pleos.tutorial.TutorialState
 import com.teamsync.pleos.tutorial.TutorialStep
 
-/** 완료 화면: 완료·건너뜀·미지원 개수, 단계별 결과와 다시 해보기, 배지. */
+/** 코스 결과 화면: 이 코스의 완료·건너뜀·미지원 개수, 단계별 확인 근거와 다시 해보기, 배지. */
 @Composable
 fun FinishScreen(
     state: TutorialState,
+    course: Course,
     steps: List<TutorialStep>,
+    courseComplete: Boolean,
     isMaster: Boolean,
     canStart: Boolean,
     onRetry: (String) -> Unit,
     onRestart: () -> Unit,
     onHome: () -> Unit,
 ) {
-    val counts = Outcome.entries.associateWith { o -> state.results.values.count { it.outcome == o } }
+    val courseSteps = course.stepIds.mapNotNull { id -> steps.firstOrNull { it.id == id } }
+    val counts = Outcome.entries.associateWith { o -> courseSteps.count { state.results[it.id]?.outcome == o } }
     LazyColumn(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("튜토리얼 결과", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
+                Text("${course.title} 결과", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
                 BigButton("홈으로", Color(0xFF374151), onHome)
             }
         }
-        if (isMaster) item {
+        if (isMaster || courseComplete) item {
             Surface(color = Color(0xFF1E3A2B), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(28.dp)) {
-                    Text("내 차 마스터", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Ok)
-                    Text("이 차에서 확인할 수 있는 기능을 모두 직접 조작했어요", fontSize = 26.sp, color = Body)
+                    Text(if (isMaster) "내 차 마스터" else "${course.title} 완료", fontSize = 48.sp, fontWeight = FontWeight.Bold, color = Ok)
+                    Text(
+                        if (isMaster) "이 차에서 확인할 수 있는 기능을 모두 직접 조작했어요" else "이 코스에서 확인할 수 있는 기능을 모두 직접 조작했어요",
+                        fontSize = 26.sp,
+                        color = Body,
+                    )
                 }
             }
         }
@@ -60,7 +68,7 @@ fun FinishScreen(
             }
         }
         if (!canStart) item { Text("다시 해보려면 정차 후 기어를 P로 바꿔 주세요", fontSize = 24.sp, color = Warn) }
-        items(steps) { step ->
+        items(courseSteps) { step ->
             val result = state.results[step.id]
             Card(null, Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -79,7 +87,9 @@ fun FinishScreen(
                                 },
                             )
                         }
-                        result?.detail?.takeIf { it.isNotEmpty() }?.let { Text(it, fontSize = 20.sp, color = Dim) }
+                        // 미지원 사유(capability 오류 원문)는 개발자 패널·로그에 있고, 여기서는 사용자 말로
+                        val detail = if (result?.outcome == Outcome.UNSUPPORTED) "이 차는 이 기능의 상태를 알려주지 않아 연습할 수 없어요" else result?.detail
+                        detail?.takeIf { it.isNotEmpty() }?.let { Text(it, fontSize = 20.sp, color = Dim) }
                     }
                     if (result?.outcome != Outcome.UNSUPPORTED) {
                         BigButton("다시 해보기", Color(0xFF2563EB), { onRetry(step.id) }, enabled = canStart)

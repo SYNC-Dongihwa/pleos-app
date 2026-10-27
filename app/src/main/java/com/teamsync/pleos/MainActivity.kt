@@ -50,15 +50,19 @@ class MainActivity : ComponentActivity() {
                             gate, canStart, onStart = AppGraph.opening::startTutorial, onLater = AppGraph.opening::dismiss,
                         )
                         tutorial.mode == Mode.Running || tutorial.mode is Mode.Paused -> TutorialScreen(
-                            tutorial, controller.steps, speech,
+                            tutorial, controller.steps, controller.course(tutorial.courseId)?.title, speech,
                             onSkip = controller::skip, onRepeat = controller::repeat, onQuit = controller::quit,
                         )
-                        tutorial.mode == Mode.Finished -> FinishScreen(
-                            tutorial, controller.steps, controller.isMaster, canStart,
-                            onRetry = controller::retry, onRestart = { controller.start(fromBeginning = true) }, onHome = controller::quit,
-                        )
+                        tutorial.mode == Mode.Finished -> {
+                            val course = controller.course(tutorial.courseId) ?: controller.everything
+                            FinishScreen(
+                                tutorial, course, controller.steps, controller.isCourseComplete(course.id), controller.isMaster, canStart,
+                                onRetry = controller::retry, onRestart = { controller.start(course.id, fromBeginning = true) }, onHome = controller::quit,
+                            )
+                        }
                         else -> HomeScreen(
-                            gate, car, vehicle, tutorial, controller.steps.size, controller.allResolved,
+                            gate, car, vehicle, tutorial, controller.courses, controller.everything, controller.steps,
+                            isCourseComplete = controller::isCourseComplete, isMaster = controller.isMaster,
                             onStart = controller::start, onShowResults = controller::showResults,
                             onOpenDevPanel = { devPanel = true },
                         )
