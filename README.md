@@ -49,7 +49,7 @@ git config user.email "sync-dongihwa@users.noreply.github.com"
 
 ### 3. Pleos Connect Emulator 설치
 
-공식 방법 (CLAUDE.md §3):
+공식 방법 ([docs/contest-guide.md](docs/contest-guide.md) §3):
 1. Android Studio → Settings → Languages & Frameworks → Android SDK → **SDK Update Sites** → `+`
    - Name: `Pleos Connect System Image`
    - URL (Windows/Linux): `https://nexus-playground.pleos.ai/repository/raw-releases/connect-avd/2.x/crp-sys-img.xml`
@@ -113,7 +113,7 @@ python -X utf8 tools/summarize_probe_log.py logs/probe.log > docs/probe-table.md
 ## 구조
 
 ```
-├─ CLAUDE.md                 # 작업 규칙·공모전 정보·진행 로그(§9) — 작업 시작 전에 먼저 읽기
+├─ CLAUDE.md                 # 현재 상태·결정·SDK 메모·퍼미션·알려진 이슈 — 작업 시작 전에 먼저 읽기
 ├─ README.md
 ├─ app/src/main/java/com/teamsync/pleos/
 │  ├─ MainActivity.kt        # 홈 (DO 선언, 퍼미션 요청 → MonitorService 시작)
