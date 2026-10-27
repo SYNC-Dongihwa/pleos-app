@@ -23,17 +23,28 @@ import androidx.compose.ui.unit.sp
 import com.teamsync.pleos.car.AaosState
 import com.teamsync.pleos.car.GateState
 import com.teamsync.pleos.log.AppLog
+import com.teamsync.pleos.tutorial.TutorialState
 import com.teamsync.pleos.vehicle.Support
 import com.teamsync.pleos.vehicle.VehicleConnection
 import com.teamsync.pleos.vehicle.VehicleSignal
 import com.teamsync.pleos.vehicle.VehicleState
 
 /**
- * Phase 1 홈: 정차 게이트와 이 차에서 확인 가능한 기능 목록만 보여준다 (튜토리얼은 Phase 2).
+ * 홈: 정차 게이트, 시작/이어서 하기, 이 차에서 확인 가능한 기능 목록.
  * 제목을 3초 안에 5번 누르면 개발자 패널.
  */
 @Composable
-fun HomeScreen(gate: GateState, car: AaosState, vehicle: VehicleState, onOpenDevPanel: () -> Unit) {
+fun HomeScreen(
+    gate: GateState,
+    car: AaosState,
+    vehicle: VehicleState,
+    tutorial: TutorialState,
+    totalSteps: Int,
+    allResolved: Boolean,
+    onStart: (fromBeginning: Boolean) -> Unit,
+    onShowResults: () -> Unit,
+    onOpenDevPanel: () -> Unit,
+) {
     val taps = remember { ArrayDeque<Long>() }
     Column(
         Modifier
@@ -60,6 +71,22 @@ fun HomeScreen(gate: GateState, car: AaosState, vehicle: VehicleState, onOpenDev
         )
 
         GateCard(gate, car)
+
+        val canStart = gate is GateState.Parked && vehicle.connection is VehicleConnection.Connected
+        val done = tutorial.results.size
+        Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            when {
+                done == 0 -> BigButton("튜토리얼 시작", Ok.copy(alpha = 0.85f), { onStart(true) }, Modifier.weight(1f), enabled = canStart)
+                allResolved -> {
+                    BigButton("결과 보기", Color(0xFF2563EB), onShowResults, Modifier.weight(1f))
+                    BigButton("처음부터 다시", Color(0xFF4B5563), { onStart(true) }, Modifier.weight(1f), enabled = canStart)
+                }
+                else -> {
+                    BigButton("이어서 하기 ($done / $totalSteps)", Ok.copy(alpha = 0.85f), { onStart(false) }, Modifier.weight(1f), enabled = canStart)
+                    BigButton("처음부터", Color(0xFF4B5563), { onStart(true) }, Modifier.weight(1f), enabled = canStart)
+                }
+            }
+        }
 
         if (vehicle.connection is VehicleConnection.Failed) {
             Card(null, Modifier.fillMaxWidth()) {

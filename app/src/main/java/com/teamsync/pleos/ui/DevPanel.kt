@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -30,7 +28,9 @@ import com.teamsync.pleos.car.AaosState
 import com.teamsync.pleos.car.GateState
 import com.teamsync.pleos.car.gearName
 import com.teamsync.pleos.log.AppLog
+import com.teamsync.pleos.tutorial.TutorialState
 import com.teamsync.pleos.vehicle.Support
+import com.teamsync.pleos.voice.SpeechGuide
 import com.teamsync.pleos.vehicle.VehicleConnection
 import com.teamsync.pleos.vehicle.VehicleSignal
 import com.teamsync.pleos.vehicle.VehicleState
@@ -45,6 +45,8 @@ fun DevPanel(
     car: AaosState,
     vehicle: VehicleState,
     errors: List<AppLog.Entry>,
+    tutorial: TutorialState,
+    speech: SpeechGuide.Status,
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -58,9 +60,7 @@ fun DevPanel(
         item {
             Row(Modifier.fillMaxWidth()) {
                 Text("개발자 패널", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.weight(1f))
-                Button(onClick = onClose, modifier = Modifier.height(72.dp), colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))) {
-                    Text("닫기", fontSize = 24.sp)
-                }
+                BigButton("닫기", Color(0xFF2563EB), onClose)
             }
         }
         item {
@@ -72,6 +72,9 @@ fun DevPanel(
                 Mono("PARKING_BRAKE_ON: ${car.parkingBrake.value ?: "-"} at ${clock(car.parkingBrake.updatedAt)}${car.parkingBrake.error?.let { " error=$it" } ?: ""}")
                 val bits = car.activeRestrictions
                 Mono("UX: requiresDO=${car.requiresDistractionOptimization ?: "-"} active=${bits?.let { "0x${it.toString(16)} [${AaosCarMonitor.describeRestrictions(it)}]" } ?: "-"}")
+                Mono("TTS: $speech")
+                Mono("tutorial: mode=${tutorial.mode} step=${tutorial.stepIndex} phase=${tutorial.phaseIndex} waiting=${tutorial.waiting ?: "-"} parked=${tutorial.parked}")
+                Mono("results: ${tutorial.results.entries.joinToString { "${it.key}=${it.value.outcome}" }.ifEmpty { "-" }}")
             }
         }
         item { Text("Vehicle SDK 신호", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White) }
