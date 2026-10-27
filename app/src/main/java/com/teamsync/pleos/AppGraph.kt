@@ -41,8 +41,12 @@ object AppGraph {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     fun init(app: Application) {
-        car = AaosCarMonitor(app).also { it.start() }
+        // vehicle을 먼저 시작해야 Car 연결 시 넘어오는 AAOS 속성(주유구·충전구) 상태가 vehicle.start()의 초기화에 지워지지 않는다
         vehicle = VehicleStateRepository(app).also { it.start() }
+        car = AaosCarMonitor(app).also {
+            it.onPropertyManager = vehicle::attachAaos
+            it.start()
+        }
         gate = car.state
             .map(ParkingGate::evaluate)
             .distinctUntilChanged()

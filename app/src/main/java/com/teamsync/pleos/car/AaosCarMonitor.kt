@@ -47,6 +47,9 @@ class AaosCarMonitor(private val context: Context) {
     private var uxManager: CarUxRestrictionsManager? = null
     private var propertyManager: CarPropertyManager? = null
 
+    /** Car 서비스에 (재)연결될 때마다 CarPropertyManager를 넘긴다 — 주유구·충전구처럼 다른 곳이 구독하는 AAOS 속성용. [start] 전에 설정. */
+    var onPropertyManager: ((CarPropertyManager) -> Unit)? = null
+
     private val uxListener = CarUxRestrictionsManager.OnUxRestrictionsChangedListener { r -> applyUx(r, "changed") }
 
     private val propertyCallback = object : CarPropertyManager.CarPropertyEventCallback {
@@ -145,6 +148,7 @@ class AaosCarMonitor(private val context: Context) {
         }
         subscribe(pm, VehiclePropertyIds.GEAR_SELECTION) { err -> _state.update { it.copy(gear = it.gear.copy(error = err)) } }
         subscribe(pm, VehiclePropertyIds.PARKING_BRAKE_ON) { err -> _state.update { it.copy(parkingBrake = it.parkingBrake.copy(error = err)) } }
+        onPropertyManager?.invoke(pm)
     }
 
     @Suppress("DEPRECATION") // API 34 기기에는 subscribePropertyEvents가 없음

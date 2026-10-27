@@ -17,6 +17,28 @@ enum class VehicleSignal(val label: String, val api: String) {
     TRUNK("트렁크", "Door.DoorPosition(REAR)"),
     DRIVER_DOOR("운전석 문", "Door.DoorPosition(ROW_1_LEFT)"),
     DRIVING_MODE("주행 모드", "DrivingMode.DrivingModeState"),
+
+    // 주유·충전 — Pleos SDK에 주유구 API가 없어 AAOS 표준 속성 사용 (문서: 표준 데이터는 AAOS Car API)
+    FUEL_DOOR("주유구", "AAOS FUEL_DOOR_OPEN"),
+    CHARGE_PORT("충전구", "AAOS EV_CHARGE_PORT_OPEN"),
+    HOOD("보닛", "Door.DoorPosition(HOOD)"),
+
+    // 비·김서림
+    FRONT_DEFROSTER("앞유리 김서림 제거", "HVAC.HvacDefrosterState(FRONT_WINDSHIELD)"),
+    REAR_DEFROSTER("뒷유리 열선", "HVAC.HvacDefrosterState(REAR_WINDSHIELD)"),
+    REAR_WIPER("뒷유리 와이퍼", "Wiper.WiperState(REAR_WINDSHIELD)"),
+    RECIRCULATION("내기 순환", "HVAC.HvacRecirculationState"),
+
+    // 추위·공조
+    HVAC_AUTO("오토 공조", "HVAC.HvacAutoState"),
+    FAN_SPEED("바람 세기", "HVAC.HvacFanSpeed"),
+    SEAT_HEAT("운전석 시트 열선", "Seat.HvacSeatTemperature(ROW_1_LEFT)"),
+
+    // 아이·야간
+    // 실측: 콘솔 Window Lock은 전체 창문 묶음 Area(1360)로 발행 → 뒷좌석을 포함하는 가장 넓은 Area를 구독 (실제 버튼도 동승석 창문 전체를 잠금)
+    WINDOW_LOCK("창문 잠금", "Window.WindowLockState(전체 창문 묶음)"),
+    CABIN_LIGHT("실내등", "Light.CabinLightState"),
+    READING_LIGHT("뒷좌석 독서등", "Light.ReadingLightState(ROW_2_LEFT)"),
 }
 
 sealed interface Support {

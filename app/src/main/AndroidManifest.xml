@@ -14,10 +14,13 @@
     <uses-permission android:name="pleos.car.permission.CAR_CLIMATE" />  <!-- A/C·온도·핸들 열선 -->
     <uses-permission android:name="pleos.car.permission.CAR_DOORS" />    <!-- 도어 잠금·트렁크·운전석 문 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />    <!-- 주행 모드 -->
+    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />    <!-- 시트 열선 -->
     <!-- Pleos TextToSpeech: SDK ApiChecker가 확인, 없으면 SecurityException (2026-10-22 실측) -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
     <!-- AAOS 표준 GEAR_SELECTION·PARKING_BRAKE_ON (정차 게이트). Pleos 문서: 기어 등 표준 데이터는 AAOS Car API로 -->
     <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
+    <!-- AAOS 표준 FUEL_DOOR_OPEN·EV_CHARGE_PORT_OPEN (주유·충전 코스). Pleos SDK에 주유구 API가 없음 -->
+    <uses-permission android:name="android.car.permission.CAR_ENERGY_PORTS" />
 
     <application
         android:name=".PleosApp"

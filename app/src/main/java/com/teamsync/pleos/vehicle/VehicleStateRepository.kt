@@ -22,12 +22,22 @@ import ai.pleos.playground.vehicle.listener.DoorLockStateListener
 import ai.pleos.playground.vehicle.listener.DoorPositionListener
 import ai.pleos.playground.vehicle.listener.DrivingModeStateListener
 import ai.pleos.playground.vehicle.listener.HvacAcStateListener
+import ai.pleos.playground.vehicle.listener.HvacAutoStateListener
+import ai.pleos.playground.vehicle.listener.HvacDefrosterStateListener
+import ai.pleos.playground.vehicle.listener.HvacFanSpeedListener
+import ai.pleos.playground.vehicle.listener.HvacRecirculationStateListener
+import ai.pleos.playground.vehicle.listener.HvacSeatTemperatureListener
 import ai.pleos.playground.vehicle.listener.HvacSteeringWheelHeatStateListener
 import ai.pleos.playground.vehicle.listener.HvacTemperatureListener
 import ai.pleos.playground.vehicle.listener.LightStateListener
 import ai.pleos.playground.vehicle.listener.TurnSignalStateListener
+import ai.pleos.playground.vehicle.listener.WindowLockStateListener
 import ai.pleos.playground.vehicle.listener.WindowPositionListener
 import ai.pleos.playground.vehicle.listener.WiperStateListener
+import android.car.VehiclePropertyIds
+import android.car.hardware.CarPropertyConfig
+import android.car.hardware.CarPropertyValue
+import android.car.hardware.property.CarPropertyManager
 import android.content.Context
 import com.teamsync.pleos.log.AppLog
 import kotlinx.coroutines.CoroutineScope
@@ -87,7 +97,7 @@ class VehicleStateRepository(private val context: Context) {
         watchLowBeam(v, gen)
         watchHighBeam(v, gen)
         watchTurnSignal(v, gen)
-        watchFrontWiper(v, gen)
+        watchWipers(v, gen)
         watchDriverWindow(v, gen)
         watchHvacAc(v, gen)
         watchDriverTemperature(v, gen)
@@ -95,7 +105,67 @@ class VehicleStateRepository(private val context: Context) {
         watchDoorLock(v, gen)
         watchDoorPosition(v, gen)
         watchDrivingMode(v, gen)
+        watchDefrosters(v, gen)
+        watchRecirculation(v, gen)
+        watchHvacAuto(v, gen)
+        watchFanSpeed(v, gen)
+        watchSeatHeat(v, gen)
+        watchWindowLock(v, gen)
+        watchCabinLight(v, gen)
+        watchReadingLight(v, gen)
         VehicleSignal.entries.forEach { armCapabilityTimeout(it, gen) }
+    }
+
+    // ---- AAOS 표준 속성 (Pleos SDK에 없는 신호) ----------------------------------------------
+
+    private var aaosManager: CarPropertyManager? = null
+
+    private val aaosCallback = object : CarPropertyManager.CarPropertyEventCallback {
+        override fun onChangeEvent(value: CarPropertyValue<*>) {
+            val s = AAOS_SIGNALS.entries.firstOrNull { it.value == value.propertyId }?.key ?: return
+            if (value.status == CarPropertyValue.STATUS_AVAILABLE) publish(s, value.value, "live")
+            else update(s) { it.copy(lastError = "AAOS status=${value.status}") }
+        }
+
+        override fun onErrorEvent(propertyId: Int, areaId: Int) {
+            val s = AAOS_SIGNALS.entries.firstOrNull { it.value == propertyId }?.key ?: return
+            AppLog.w(TAG, "AAOS onErrorEvent ${s.name} area=$areaId")
+            update(s) { it.copy(lastError = "AAOS onErrorEvent area=$areaId") }
+        }
+    }
+
+    /**
+     * 주유구·충전구: Car 서비스가 연결되면 [com.teamsync.pleos.car.AaosCarMonitor]가 넘겨준다.
+     * carPropertyConfig에 속성이 없으면(예: 전기차의 FUEL_DOOR_OPEN) '지원 안 됨'. 퍼미션 `android.car.permission.CAR_ENERGY_PORTS`.
+     */
+    fun attachAaos(pm: CarPropertyManager) {
+        aaosManager = pm
+        for ((s, id) in AAOS_SIGNALS) {
+            val name = VehiclePropertyIds.toString(id)
+            try {
+                val config = pm.getCarPropertyConfig(id)
+                if (config == null) {
+                    unsupported(s, "AAOS $name 속성 없음 (carPropertyConfig)")
+                    continue
+                }
+                val readable = config.access == CarPropertyConfig.VEHICLE_PROPERTY_ACCESS_READ ||
+                    config.access == CarPropertyConfig.VEHICLE_PROPERTY_ACCESS_READ_WRITE
+                AppLog.i(TAG, "CAP ${s.name} AAOS $name access=${config.access}")
+                if (!readable) {
+                    unsupported(s, "AAOS $name 읽기 불가 (access=${config.access})")
+                    continue
+                }
+                update(s) { it.copy(support = Support.Supported("AAOS $name access=${config.access}")) }
+                publish(s, pm.getBooleanProperty(id, 0), "get")
+                @Suppress("DEPRECATION") // API 34 기기에는 subscribePropertyEvents가 없음
+                val ok = pm.registerCallback(aaosCallback, id, CarPropertyManager.SENSOR_RATE_ONCHANGE)
+                AppLog.i(TAG, "REG ${s.name} (AAOS $name) ok=$ok")
+            } catch (e: Exception) {
+                // 퍼미션이 없으면 SecurityException
+                AppLog.e(TAG, "AAOS ${s.name} $name failed ${e.javaClass.simpleName}: ${e.message}", e)
+                unsupported(s, "AAOS $name: ${e.javaClass.simpleName}: ${e.message}")
+            }
+        }
     }
 
     fun stop() {
@@ -106,6 +176,10 @@ class VehicleStateRepository(private val context: Context) {
                 .onFailure { AppLog.e(TAG, "UNREG ${signal.name} threw ${it.message}", it) }
         }
         unregisters.clear()
+        aaosManager?.let { pm ->
+            runCatching { pm.unregisterCallback(aaosCallback) }.onFailure { AppLog.e(TAG, "AAOS unregister threw ${it.message}", it) }
+        }
+        aaosManager = null
         vehicle?.let { v ->
             runCatching { v.release() }
                 .onSuccess { AppLog.i(TAG, "Vehicle.release() ok") }
@@ -194,21 +268,164 @@ class VehicleStateRepository(private val context: Context) {
         }, capabilityFailed(s, "checkTurnSignalStateCapabilities"))
     }
 
-    private fun watchFrontWiper(v: Vehicle, gen: Int) {
-        val s = VehicleSignal.FRONT_WIPER
+    /** 앞·뒤 와이퍼는 같은 capability(WiperState)를 공유 → 한 번 확인하고 Area별로 등록. */
+    private fun watchWipers(v: Vehicle, gen: Int) {
         val api = v.getWiper()
+        val targets = listOf(VehicleSignal.FRONT_WIPER to WindowValue.FRONT_WINDSHIELD, VehicleSignal.REAR_WIPER to WindowValue.REAR_WINDSHIELD)
         api.checkWiperStateCapabilities({ config: CapabilityConfig, areas: Map<WindowArea, List<WiperState>> ->
-            val area = pick(areas.keys, { it.values }, WindowValue.FRONT_WINDSHIELD)
-            onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()}", area) {
-                api.getCurrentWiperState(area!!, { publish(s, it, "get") }, failed(s, "getCurrentWiperState"))
-                val l = object : WiperStateListener {
-                    override fun onWiperStateUpdated(state: WiperState?) = publish(s, state, "live")
-                    override fun onFailed(e: Exception) = failed(s, "registerWiperState")(e)
+            for ((s, value) in targets) {
+                val area = pick(areas.keys, { it.values }, value)
+                onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()}", area) {
+                    api.getCurrentWiperState(area!!, { publish(s, it, "get") }, failed(s, "getCurrentWiperState"))
+                    val l = object : WiperStateListener {
+                        override fun onWiperStateUpdated(state: WiperState?) = publish(s, state, "live")
+                        override fun onFailed(e: Exception) = failed(s, "registerWiperState")(e)
+                    }
+                    api.registerWiperState(area, l)
+                    registered(s) { api.unregisterWiperState(area, l) }
                 }
-                api.registerWiperState(area, l)
-                registered(s) { api.unregisterWiperState(area, l) }
             }
-        }, capabilityFailed(s, "checkWiperStateCapabilities"))
+        }) { e -> targets.forEach { (s, _) -> capabilityFailed(s, "checkWiperStateCapabilities")(e) } }
+    }
+
+    /** 앞유리 김서림 제거·뒷유리 열선: 같은 capability(HvacDefroster). */
+    private fun watchDefrosters(v: Vehicle, gen: Int) {
+        val api = v.getHVAC()
+        val targets = listOf(VehicleSignal.FRONT_DEFROSTER to WindowValue.FRONT_WINDSHIELD, VehicleSignal.REAR_DEFROSTER to WindowValue.REAR_WINDSHIELD)
+        api.checkHvacDefrosterCapabilities({ config: CapabilityConfig, areas: List<WindowArea> ->
+            for ((s, value) in targets) {
+                val area = pick(areas, { it.values }, value)
+                onCapability(gen, s, config, "areas=${areas.map { it.values.toList() }} use=${area?.values?.toList()}", area) {
+                    api.getHvacDefrosterState(area!!, { publish(s, it, "get") }, failed(s, "getHvacDefrosterState"))
+                    val l = object : HvacDefrosterStateListener {
+                        override fun onHvacDefrosterStateUpdated(state: Boolean?) = publish(s, state, "live")
+                        override fun onFailed(e: Exception) = failed(s, "registerHvacDefrosterState")(e)
+                    }
+                    api.registerHvacDefrosterState(area, l)
+                    registered(s) { api.unregisterHvacDefrosterState(area, l) }
+                }
+            }
+        }) { e -> targets.forEach { (s, _) -> capabilityFailed(s, "checkHvacDefrosterCapabilities")(e) } }
+    }
+
+    private fun watchRecirculation(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.RECIRCULATION
+        val api = v.getHVAC()
+        api.checkHvacRecirculationCapabilities({ config: CapabilityConfig, areas: List<SeatArea> ->
+            val area = pick(areas, { it.values }, SeatValue.ROW_1_LEFT)
+            onCapability(gen, s, config, "areas=${areas.map { it.values.toList() }} use=${area?.values?.toList()}", area) {
+                api.getHvacRecirculationState(area!!, { publish(s, it, "get") }, failed(s, "getHvacRecirculationState"))
+                // SDK의 리스너 메서드 이름은 onHvacAutoRecirculationStateUpdated (내기 순환·자동 내기 순환이 같은 리스너를 씀)
+                val l = object : HvacRecirculationStateListener {
+                    override fun onHvacAutoRecirculationStateUpdated(state: Boolean?) = publish(s, state, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerHvacRecirculationState")(e)
+                }
+                api.registerHvacRecirculationState(area, l)
+                registered(s) { api.unregisterHvacRecirculationState(area, l) }
+            }
+        }, capabilityFailed(s, "checkHvacRecirculationCapabilities"))
+    }
+
+    private fun watchHvacAuto(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.HVAC_AUTO
+        val api = v.getHVAC()
+        api.checkHvacAutoCapabilities({ config: CapabilityConfig, areas: List<SeatArea> ->
+            val area = pick(areas, { it.values }, SeatValue.ROW_1_LEFT)
+            onCapability(gen, s, config, "areas=${areas.map { it.values.toList() }} use=${area?.values?.toList()}", area) {
+                api.getHvacAutoState(area!!, { publish(s, it, "get") }, failed(s, "getHvacAutoState"))
+                val l = object : HvacAutoStateListener {
+                    override fun onHvacAutoStateUpdated(state: Boolean?) = publish(s, state, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerHvacAutoState")(e)
+                }
+                api.registerHvacAutoState(area, l)
+                registered(s) { api.unregisterHvacAutoState(area, l) }
+            }
+        }, capabilityFailed(s, "checkHvacAutoCapabilities"))
+    }
+
+    private fun watchFanSpeed(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.FAN_SPEED
+        val api = v.getHVAC()
+        api.checkHvacFanSpeedCapabilities({ config: CapabilityConfig, areas: Map<SeatArea, AreaBounds<Int>> ->
+            val area = pick(areas.keys, { it.values }, SeatValue.ROW_1_LEFT)
+            onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()} bounds=${areas[area]?.range()}", area) {
+                api.getHvacFanSpeed(area!!, { publish(s, it, "get") }, failed(s, "getHvacFanSpeed"))
+                val l = object : HvacFanSpeedListener {
+                    override fun onHvacFanSpeedUpdated(speed: Int?) = publish(s, speed, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerHvacFanSpeed")(e)
+                }
+                api.registerHvacFanSpeed(area, l)
+                registered(s) { api.unregisterHvacFanSpeed(area, l) }
+            }
+        }, capabilityFailed(s, "checkHvacFanSpeedCapabilities"))
+    }
+
+    private fun watchSeatHeat(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.SEAT_HEAT
+        val api = v.getSeat()
+        api.checkSeatTemperatureCapabilities({ config: CapabilityConfig, areas: Map<SeatArea, AreaBounds<Int>> ->
+            val area = pick(areas.keys, { it.values }, SeatValue.ROW_1_LEFT)
+            onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()} bounds=${areas[area]?.range()}", area) {
+                api.getHvacSeatTemperature(area!!, { publish(s, it, "get") }, failed(s, "getHvacSeatTemperature"))
+                val l = object : HvacSeatTemperatureListener {
+                    override fun onHvacSeatTemperatureUpdated(level: Int?) = publish(s, level, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerHvacSeatTemperature")(e)
+                }
+                api.registerHvacSeatTemperature(area, l)
+                registered(s) { api.unregisterHvacSeatTemperature(area, l) }
+            }
+        }, capabilityFailed(s, "checkSeatTemperatureCapabilities"))
+    }
+
+    private fun watchWindowLock(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.WINDOW_LOCK
+        val api = v.getWindow()
+        api.checkWindowLockCapabilities({ config: CapabilityConfig, areas: List<WindowArea> ->
+            // 단독 ROW_2_LEFT Area로 구독하면 묶음 Area(1360) 이벤트가 걸러져 안 옴 (10-27 로그: onChangeEvent areaId=1360) → 가장 넓은 Area
+            val area = areas.filter { WindowValue.ROW_2_LEFT in it.values }.maxByOrNull { it.values.size }
+            onCapability(gen, s, config, "areas=${areas.map { it.values.toList() }} use=${area?.values?.toList()}", area) {
+                api.getCurrentWindowLockState(area!!, { publish(s, it, "get") }, failed(s, "getCurrentWindowLockState"))
+                val l = object : WindowLockStateListener {
+                    override fun onWindowLockStateUpdated(state: Boolean?) = publish(s, state, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerWindowLockState")(e)
+                }
+                api.registerWindowLockState(area, l)
+                registered(s) { api.unregisterWindowLockState(area, l) }
+            }
+        }, capabilityFailed(s, "checkWindowLockCapabilities"))
+    }
+
+    private fun watchCabinLight(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.CABIN_LIGHT
+        val api = v.getLight()
+        api.checkCabinLightStateCapabilities({ config: CapabilityConfig, values: List<LightState> ->
+            onCapability(gen, s, config, "values=$values") {
+                api.getCurrentCabinLightState({ publish(s, it, "get") }, failed(s, "getCurrentCabinLightState"))
+                val l = object : LightStateListener {
+                    override fun onLightStateUpdated(state: LightState?) = publish(s, state, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerCabinLightState")(e)
+                }
+                api.registerCabinLightState(l)
+                registered(s) { api.unregisterCabinLightState(l) }
+            }
+        }, capabilityFailed(s, "checkCabinLightStateCapabilities"))
+    }
+
+    private fun watchReadingLight(v: Vehicle, gen: Int) {
+        val s = VehicleSignal.READING_LIGHT
+        val api = v.getLight()
+        api.checkReadingLightStateCapabilities({ config: CapabilityConfig, areas: Map<SeatArea, List<LightState>> ->
+            val area = pick(areas.keys, { it.values }, SeatValue.ROW_2_LEFT)
+            onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()}", area) {
+                api.getCurrentReadingLightState(area!!, { publish(s, it, "get") }, failed(s, "getCurrentReadingLightState"))
+                val l = object : LightStateListener {
+                    override fun onLightStateUpdated(state: LightState?) = publish(s, state, "live")
+                    override fun onFailed(e: Exception) = failed(s, "registerReadingLightState")(e)
+                }
+                api.registerReadingLightState(area, l)
+                registered(s) { api.unregisterReadingLightState(area, l) }
+            }
+        }, capabilityFailed(s, "checkReadingLightStateCapabilities"))
     }
 
     private fun watchDriverWindow(v: Vehicle, gen: Int) {
@@ -299,11 +516,12 @@ class VehicleStateRepository(private val context: Context) {
         }, capabilityFailed(s, "checkDoorLockCapabilities"))
     }
 
-    /** 트렁크와 운전석 문은 같은 capability(DoorPosition)를 공유 → 한 번 확인하고 Area별로 나눠 등록. */
+    /** 트렁크·운전석 문·보닛은 같은 capability(DoorPosition)를 공유 → 한 번 확인하고 Area별로 나눠 등록. */
     private fun watchDoorPosition(v: Vehicle, gen: Int) {
         val api = v.getDoor()
+        val targets = listOf(VehicleSignal.TRUNK to DoorValue.REAR, VehicleSignal.DRIVER_DOOR to DoorValue.ROW_1_LEFT, VehicleSignal.HOOD to DoorValue.HOOD)
         api.checkDoorPositionCapabilities({ config: CapabilityConfig, areas: Map<DoorArea, AreaBounds<Int>> ->
-            for ((s, value) in listOf(VehicleSignal.TRUNK to DoorValue.REAR, VehicleSignal.DRIVER_DOOR to DoorValue.ROW_1_LEFT)) {
+            for ((s, value) in targets) {
                 val area = pick(areas.keys, { it.values }, value)
                 onCapability(gen, s, config, "areas=${areas.describe { it.values }} use=${area?.values?.toList()} bounds=${areas[area]?.range()}", area) {
                     api.getCurrentDoorPosition(area!!, { publish(s, it, "get") }, failed(s, "getCurrentDoorPosition"))
@@ -315,10 +533,7 @@ class VehicleStateRepository(private val context: Context) {
                     registered(s) { api.unregisterDoorPosition(area, l) }
                 }
             }
-        }) { e ->
-            capabilityFailed(VehicleSignal.TRUNK, "checkDoorPositionCapabilities")(e)
-            capabilityFailed(VehicleSignal.DRIVER_DOOR, "checkDoorPositionCapabilities")(e)
-        }
+        }) { e -> targets.forEach { (s, _) -> capabilityFailed(s, "checkDoorPositionCapabilities")(e) } }
     }
 
     private fun watchDrivingMode(v: Vehicle, gen: Int) {
@@ -429,6 +644,10 @@ class VehicleStateRepository(private val context: Context) {
     companion object {
         private const val TAG = "Vehicle"
         private const val CAPABILITY_TIMEOUT_MS = 5_000L
+        private val AAOS_SIGNALS = linkedMapOf(
+            VehicleSignal.FUEL_DOOR to VehiclePropertyIds.FUEL_DOOR_OPEN,
+            VehicleSignal.CHARGE_PORT to VehiclePropertyIds.EV_CHARGE_PORT_OPEN,
+        )
         private val NOT_SUPPORTED = setOf(
             ErrorCode.ERROR_NOT_SUPPORTED_PROPERTY,
             ErrorCode.ERROR_NOT_SUPPORTED_AREA,
