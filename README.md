@@ -1,16 +1,12 @@
-# Pleos Connect 차량용 앱 (가칭)
+# 내 차 튜토리얼
 
-> 현대자동차그룹 차량용 앱 개발 공모전 출품 예정 앱. **현재 단계: M1 — SDK Probe** (앱 아이디어 확정 전).
-> 앱 이름·한 줄 소개·APK 위치는 아이디어 확정 후 채운다 (제출 형식은 [CLAUDE.md](CLAUDE.md) §2).
+> 처음 타는 차에서 전조등·와이퍼·창문 같은 기능을 직접 조작하면, **Vehicle SDK의 실제 상태 변화로** 조작 완료를 확인해 주는 인터랙티브 튜토리얼 (현대자동차그룹 차량용 앱 개발 공모전 출품작).
+> **현재 단계: Phase 1 완료 — 기반** (차량 신호 구독, 정차 게이트, 개발자 패널). 튜토리얼 화면은 Phase 2. 작업 현황은 [CLAUDE.md](CLAUDE.md).
 
-지금 들어 있는 것 (런처 이름 **Pleos Dev**):
-- **홈 (공통 기반)** — Foreground Service로 차량·내비 상태 상시 수신, CarUxRestrictions에 따라 주행/정차 레이아웃 전환, 1줄 주행 알림, NaviHelper 경유지 래퍼. 설계·검증: [docs/common-foundation.md](docs/common-foundation.md)
-- **SDK Probe** (홈 → 개발자 도구 → SDK Probe 열기) — Vehicle SDK 전 도메인(20개)의 Capability/Get/Callback과 NaviHelper 이벤트를 실제로 호출해 실시간 표시·로그. 실측 결과: [docs/sdk-probe-results.md](docs/sdk-probe-results.md), 전체 표: [docs/probe-table.md](docs/probe-table.md)
-- 아이디어 비교: [docs/idea-comparison.md](docs/idea-comparison.md)
-
-| 홈 (정차) | 1줄 알림 | SDK Probe |
-|---|---|---|
-| ![홈](docs/img/home-parked.png) | ![알림](docs/img/home-alert-bar.png) | ![Probe](docs/img/probe-screen.png) |
+지금 들어 있는 것 (런처 이름 **내 차 튜토리얼**):
+- **홈** — 정차 게이트(기어 P 여부, 주차 브레이크 표시)와 이 차에서 확인할 수 있는 기능 목록(지원 / 지원 안 됨).
+- **개발자 패널** (홈 제목을 3초 안에 5번 탭) — 구독 중인 신호의 실시간 원시 값, capability 결과, 퍼미션 부여 여부, 최근 오류·경고 50개.
+- 이전 단계(SDK Probe·상시 수신 서비스·내비 래퍼)의 코드는 git 태그 `archive/pleos-probe-2026-10-22`, 당시 실측 문서는 `docs/`에 있다.
 
 ## 테스트 환경
 
@@ -71,10 +67,9 @@ adb shell am start -n com.teamsync.pleos/.MainActivity
 ```
 
 Windows PowerShell이면 `.\gradlew.bat :app:installDebug`. `JAVA_HOME`이 JDK 11 이하로 잡혀 있으면 빌드가 실패하므로 JBR 경로로 바꾼다.
-- 첫 실행 시 알림 권한 다이얼로그 → 허용. 그 뒤 모니터링 서비스가 시작되고 알림 영역에 "차량 상태 모니터링 중"이 상주한다 (홈의 시작/중지 버튼, 알림의 "중지").
-- 홈 하단 **개발자 도구**(debug 빌드에서만 보임): SDK Probe 열기 / TTS 테스트 / 경로: 판교역 / 경유지 +정자역 / 경유지 +서현역 / 첫 경유지 제거 / 경유지 모두 제거 / 경로 취소 / 도착 예상: 판교역·강릉역. 경로·경유지 요청 시 Navigation 앱이 앞으로 나오므로 런처에서 Pleos Dev를 다시 눌러 돌아온다 (도착 예상은 전환 없음).
+- 런타임 권한 요청은 없다 (선언한 퍼미션이 모두 normal). 실행하면 바로 차량 신호를 구독한다.
+- 개발자 패널: 홈의 "내 차 튜토리얼" 제목을 3초 안에 5번 탭. adb로는 제목 좌표에 `input tap`을 5번.
 - 음성(TTS)이 응답 없이 멈추면 Pleos AI 서비스를 재시작한다: `adb shell am force-stop ai.pleos.playground.caas` (잘못된 로캘 요청 후 서비스가 멈췄던 사례, docs/ondevice-ai-design.md).
-- Probe는 열리면 자동으로 전 도메인을 조사한다(약 5초). 상단 버튼: Vehicle 재실행 / Navi 정보 요청 / 테스트 경로(판교역) / 경로 취소 / 퍼미션 새로고침.
 
 ### 5. Virtual Console (차량 상태 조작)
 
@@ -82,30 +77,22 @@ Windows PowerShell이면 `.\gradlew.bat :app:installDebug`. `JAVA_HOME`이 JDK 1
 adb forward tcp:8088 tcp:8088
 ```
 
-PC 브라우저에서 `http://127.0.0.1:8088/` → 화면의 Gear·Climate·Body 패널, 또는 **Emulation Controls**(SOC, 주행가능거리, 경고등 등 48개 항목)에서 값을 바꾸면 Probe의 LIVE 행이 초록색으로 깜빡이며 갱신된다.
+PC 브라우저에서 `http://127.0.0.1:8088/` → 화면의 Gear·Climate·Body 패널, 또는 **Emulation Controls**(48개 카드)에서 값을 바꾸면 개발자 패널의 값과 `SYNC/Vehicle` 로그가 1초 안에 바뀐다. 트렁크는 "Trunk / Frunk Position" 카드에서 **trunk를 먼저 선택**해야 한다 (기본값 frunk).
 자동화할 때는 [tools/vc-helper.js](tools/vc-helper.js)를 브라우저 콘솔에 붙여넣고 `__vc.press('Gear Selection','D')`처럼 카드 제목으로 조작한다.
-⚠️ 기어를 D로 두면 앱이 "주행 중에는 사용할 수 없습니다"로 가려진다. 홈은 DO를 선언했지만 사이드로드 앱이라 인정되지 않는다 (docs/common-foundation.md §3). 화면을 보려면 P로 돌린다. 가려진 동안에도 서비스는 계속 수신한다.
+⚠️ 기어를 D로 두면 시스템이 앱을 "주행 중에는 사용할 수 없습니다"로 가린다 (정차 전용 앱이라 DO 미선언). 가려진 동안에도 프로세스는 신호를 계속 받고, P로 돌리면 정차 게이트가 다시 열린다.
 
 ### 6. 로그 보기
 
-로그 태그는 모두 `PLEOS/` 접두사다 (`PLEOS/Vehicle`, `PLEOS/Navi`, `PLEOS/UX`, `PLEOS/Service`, `PLEOS/Session`, `PLEOS/Alert`, `PLEOS/Notify`, `PLEOS/Speech`, `PLEOS/Perm`, `PLEOS/App`, `PLEOS/UI`). `adb logcat -s 'PLEOS/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
+로그 태그는 모두 `SYNC/` 접두사다 (`SYNC/Vehicle`, `SYNC/Car`, `SYNC/Gate`, `SYNC/UI`, `SYNC/App`, `SYNC/Speech`). `adb logcat -s 'SYNC/*'`는 와일드카드가 지원되지 않아 동작하지 않는다.
 
 ```bash
-adb logcat -v time | grep "PLEOS/"
-```
-
-```bash
-adb logcat -v time -s PLEOS/Vehicle PLEOS/Navi PLEOS/UX PLEOS/Service PLEOS/Alert PLEOS/Notify
+adb logcat -v time | grep "SYNC/"
 ```
 
 앱 내부 로그 파일 (AAOS 에뮬레이터의 앱 사용자는 **user 10**, 날짜는 에뮬레이터 시간대 PDT 기준):
 
 ```bash
-adb exec-out run-as com.teamsync.pleos --user 10 cat files/logs/app-20261021.log > logs/probe.log
-```
-
-```bash
-python -X utf8 tools/summarize_probe_log.py logs/probe.log > docs/probe-table.md
+adb exec-out run-as com.teamsync.pleos --user 10 cat files/logs/app-20261026.log > logs/app.log
 ```
 
 `logs/`는 `.gitignore` 대상이다.
@@ -116,16 +103,16 @@ python -X utf8 tools/summarize_probe_log.py logs/probe.log > docs/probe-table.md
 ├─ CLAUDE.md                 # 현재 상태·결정·SDK 메모·퍼미션·알려진 이슈 — 작업 시작 전에 먼저 읽기
 ├─ README.md
 ├─ app/src/main/java/com/teamsync/pleos/
-│  ├─ MainActivity.kt        # 홈 (DO 선언, 퍼미션 요청 → MonitorService 시작)
-│  ├─ ProbeActivity.kt       # SDK Probe (DO 미선언)
-│  ├─ core/                  # CarSession, VehicleMonitor, UxRestrictionsMonitor, NaviController, alert/(AlertCenter·Rules·Notifier)
-│  ├─ service/MonitorService.kt  # 상시 수신 Foreground Service (specialUse)
-│  ├─ log/AppLog.kt          # 공통 로그 래퍼 (logcat + filesDir/logs 롤링 파일 + 화면용 tail)
-│  ├─ vehicle/VehicleErrors.kt  # 난독화된 Vehicle 예외에서 ErrorCode 추출
-│  ├─ probe/                 # VehicleProbe(리플렉션 전수 호출), NaviProbe, PermissionReport, ViewModel
-│  └─ ui/                    # HomeScreen, OneLineAlertBar, ProbeScreen (Compose)
-├─ docs/                     # 실측 결과, 결과표, 스크린샷
-├─ tools/                    # summarize_probe_log.py (Probe 로그 → 결과표), vc-helper.js (Virtual Console 조작)
+│  ├─ PleosApp.kt · AppGraph.kt   # 프로세스 단위 초기화 (SDK 구독은 여기서 한 번만)
+│  ├─ MainActivity.kt        # 홈 ↔ 개발자 패널
+│  ├─ vehicle/               # VehicleStateRepository(capability → get → 구독 → StateFlow), VehicleSignal, VehicleErrors
+│  ├─ car/                   # AaosCarMonitor(주행 규제·GEAR_SELECTION·PARKING_BRAKE_ON), ParkingGate
+│  ├─ voice/SpeechGuide.kt   # Pleos TTS 온디바이스 래퍼 (Phase 2에서 사용)
+│  ├─ log/AppLog.kt          # 공통 로그 (SYNC/ 태그, logcat + 롤링 파일 + 최근 오류 50개)
+│  └─ ui/                    # HomeScreen, DevPanel (Compose)
+├─ app/src/test/             # 단위 테스트 (ParkingGate, Area 선택) — test double은 여기에만
+├─ docs/                     # 공모전 규정, 이전 실측 기록, 스크린샷
+├─ tools/vc-helper.js        # Virtual Console 스크립트 조작
 └─ apk/                      # 제출용 release APK 위치 (아직 없음)
 ```
 

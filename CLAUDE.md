@@ -8,17 +8,30 @@
 사용 장면: 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허 운전자.
 
 ## 2. 현재 상태
-- **Phase 0 (조사·계획) 완료 — 사용자 계획 확인 대기.** 브랜치 `feat/car-tutorial`. 이전 앱(Probe·FGS·내비·알림)은 태그 `archive/pleos-probe-2026-10-22`.
-- 다음 할 일 (Phase 1 — 기반): SDK 의존성 정리·초기화, Logger `SYNC/`, `VehicleStateRepository`(capability → 구독 → StateFlow), 정차 게이트, 숨김 개발자 패널. 완료 기준: Virtual Console 조작 → 패널 값 변화 + 로그.
+- **Phase 1 (기반) 완료 2026-10-27**, 브랜치 `feat/car-tutorial`. 이전 앱(Probe·FGS·내비·알림)은 태그 `archive/pleos-probe-2026-10-22`.
+  - 구성: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(Pleos 신호 11개 + 주행 모드) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate`(순수 함수, 단위 테스트) · 홈(게이트·지원 목록) · 숨김 개발자 패널(제목 5탭).
+- **다음 할 일 (Phase 2 — 튜토리얼 엔진·UI)**: 단계 정의 데이터 분리 → 상태 전이 판정·20초 힌트·건너뛰기·미지원 자동 처리·원복 확인 → TTS(`voice/SpeechGuide`)·주행 전환 일시정지·완료 화면·DataStore 진행 저장. 완료 기준: 콘솔만으로 전 단계 완주 + 판정 근거 로그.
 - 일정: Phase 1~2 → 11/7, Phase 3 → 11/13, 접수 마감 11/15 23:59. 10/28 설명회 질문은 §7 끝.
+
+**Phase 1 검증 (10-27, 에뮬레이터 + Virtual Console)** — 콘솔 조작마다 개발자 패널 값과 로그가 1초 안에 바뀜. 실행 직후 capability 11개 성공·주행 모드만 `ERROR_NOT_SUPPORTED_PROPERTY`로 '지원 안 됨'. 단위 테스트 9개 통과.
+```
+SYNC/Car: PROP GEAR_SELECTION = 4 P (get) / PARKING_BRAKE_ON = false (get) / UX initial: requiresDO=false active=0x0
+SYNC/Vehicle: CAP DOOR_LOCK accessType=READ_WRITE areas=[[HOOD], [ROW_1_LEFT, ROW_1_RIGHT, ROW_2_LEFT, ROW_2_RIGHT]] use=[4도어 묶음]
+SYNC/Vehicle: VAL LOW_BEAM = ON (live) → OFF   | HIGH_BEAM ON→OFF | FRONT_WIPER ON→OFF (콘솔 Low/Off)
+SYNC/Vehicle: VAL DRIVER_WINDOW = 4 (콘솔 40%) → 0 | HVAC_AC false→true | DRIVER_TEMPERATURE 22.0→21.0 | STEERING_HEAT 3→0
+SYNC/Vehicle: VAL DOOR_LOCK false→true | TURN_SIGNAL LEFT→RIGHT→OFF | DRIVER_DOOR 1→0 | TRUNK 100→0
+SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기어 D) → P 복귀 후 gate → Parked
+```
 
 ## 3. 결정 사항과 이유
 | 날짜 | 결정 | 이유 |
 |---|---|---|
 | 10-27 | 제품 = "내 차 튜토리얼" | 사용자 확정 |
-| 10-27 | 기어는 **AAOS `GEAR_SELECTION`**(CarPropertyManager) 우선, Pleos `Gear`는 쓰지 않음 | 공식 문서: 기어·속도 등 표준 데이터는 AAOS Car API로 (pleos-connect-sdk-api). Pleos `Gear`는 AAR엔 있으나 deprecated·문서에 없음 |
-| 10-27 | (확인 대기) 정차 게이트 = 기어 P 필수 + 주차 브레이크는 표시만 | 주차 브레이크는 Pleos API 없음, AAOS `PARKING_BRAKE_ON`은 에뮬레이터에서 항상 false(콘솔에 조작 카드 없음) → 필수로 두면 시연 불가 |
-| 10-27 | (확인 대기) 비상등·사이드미러 접기 단계는 목록에서 제외, 대신 상향등·트렁크 추가 | 두 기능 모두 SDK API 없음(§4). 상향등·트렁크는 SDK 구독 + 콘솔 조작 가능 |
+| 10-27 | 기어는 **AAOS `GEAR_SELECTION`**(CarPropertyManager) 사용, Pleos `Gear`는 쓰지 않음 (사용자 승인) | 공식 문서: 기어·속도 등 표준 데이터는 AAOS Car API로 (pleos-connect-sdk-api). Pleos `Gear`는 AAR엔 있으나 deprecated·문서에 없음 |
+| 10-27 | 정차 게이트 = 기어 P + 주행 규제 없음. 주차 브레이크는 표시만 (사용자 승인) | 주차 브레이크는 Pleos API 없음, AAOS `PARKING_BRAKE_ON`은 에뮬레이터에서 항상 false(콘솔에 조작 카드 없음) → 필수로 두면 시연 불가. 기어를 못 읽으면 `Unknown` → 시작 안 함 |
+| 10-27 | 비상등·사이드미러 접기 단계 제외, 상향등·트렁크 추가 (사용자 승인) | 두 기능 모두 SDK API 없음(§4). 상향등·트렁크는 SDK 구독 + 콘솔 조작 가능 |
+| 10-27 | SDK 구독은 `AppGraph`(Application)에서 한 번만, 화면 단위로 해제하지 않음 | §7-4(해제 시 앱 전체 구독 삭제). D로 가려져도 프로세스는 살아 있어 신호 계속 수신 |
+| 10-27 | 개발자 패널은 release에도 숨김 진입(제목 5탭)으로 유지 | PT 현장 진단용, 실제 값만 표시. 심사에서 지적되면 `BuildConfig.DEBUG`로 제한 |
 | 10-27 | 주행 모드 단계는 유지 | API 있음, 에뮬레이터는 미지원 → 동적 '지원 안 됨' 처리의 실제 예 |
 | 10-27 | Logger 태그 `PLEOS/` → `SYNC/` | 요구사항 |
 | 10-27 | FGS·NaviHelper·알림·Probe 제거 (git 태그로 보존) | 튜토리얼은 앞화면 전용. 미사용 퍼미션 = 심사 반려 |
@@ -64,12 +77,14 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 - [ ] `android.car.permission.CAR_POWERTRAIN` — AAOS 기어·주차 브레이크 (AAOS 표준 퍼미션, 사전 승인 대상인지 **미확인**)
 - [ ] (Phase 3 선택) `pleos.car.permission.CONTROL_CAR_LIGHTS` — 오프닝 조명
 - [ ] (Phase 3 선택) STT 퍼미션 + `android.permission.RECORD_AUDIO` — 음성 명령 (미확인)
-- Phase 1에서 **제거**: `CAR_ENERGY, CAR_INFO, CAR_MIRRORS, CAR_SAFETY, CAR_SEATS, CAR_TOLL, PRIVATE_CAR_INFO, PRIVATE_CAR_SAFETY, NAVI_ROUTE, NAVI_ROUTE_SEARCH`, `android.car.permission.CAR_SPEED`, `CAR_EXTERIOR_ENVIRONMENT`, `FOREGROUND_SERVICE*`, `POST_NOTIFICATIONS`
+- Phase 1에서 **제거 완료**: `CAR_ENERGY, CAR_INFO, CAR_MIRRORS, CAR_SAFETY, CAR_SEATS, CAR_TOLL, PRIVATE_CAR_INFO, PRIVATE_CAR_SAFETY, NAVI_ROUTE, NAVI_ROUTE_SEARCH`, `android.car.permission.CAR_SPEED`, `CAR_EXTERIOR_ENVIRONMENT`, `FOREGROUND_SERVICE*`, `POST_NOTIFICATIONS`
+- 매니페스트 병합으로 SDK가 추가하는 것 (우리가 선언 안 함, 신청 대상 아님 [추정]): `ai.pleos.playground.service.vehicle.VEHICLE_BINDING`(Vehicle), `android.permission.INTERNET`(TextToSpeech·universal-access). 확인: `app/build/outputs/logs/manifest-merger-debug-report.txt`
 
 ## 6. 빌드·실행·검증 명령
 - 빌드·설치 (JDK 17+, `JAVA_HOME`=Android Studio JBR): `./gradlew :app:installDebug` → `adb shell am start -n com.teamsync.pleos/.MainActivity`
 - 에뮬레이터: AVD `Pleos_Connect_v2.1.0_API_34` (설치는 README §3). Virtual Console: `adb forward tcp:8088 tcp:8088` → `http://127.0.0.1:8088/`, 스크립트 조작은 `tools/vc-helper.js`
-- 로그 (Phase 1부터 태그 `SYNC/`; 지금 코드는 `PLEOS/`): `adb logcat -v time | grep "SYNC/"` — ⚠️ `-s 'SYNC/*'`는 와일드카드 미지원으로 0줄
+- 로그 (태그 `SYNC/Vehicle`·`SYNC/Car`·`SYNC/Gate`·`SYNC/UI`·`SYNC/App`): `adb logcat -v time | grep "SYNC/"` — ⚠️ `-s 'SYNC/*'`는 와일드카드 미지원으로 0줄. 키워드: `CAP`(capability), `REG`/`UNREG`, `VAL`(값 변경), `FAIL`, `UNSUPPORTED`, `PROP`(AAOS 속성), `UX`, `gate →`
+- 개발자 패널: 홈 제목 "내 차 튜토리얼"을 3초 안에 5번 탭 (adb: `uiautomator dump`로 제목 좌표 → `input tap` ×5를 한 `adb shell` 안에서)
 - 앱 로그 파일 (AAOS 앱 사용자 = user 10, 날짜는 에뮬레이터 PDT): `adb exec-out run-as com.teamsync.pleos --user 10 cat files/logs/app-YYYYMMDD.log`
 - SDK 내부 로그: `[Pleos][SDK]a`(앱 쪽), `[Pleos]u`(Vehicle 서비스), `[GAAS]`(TTS 엔진)
 - TTS가 응답 없이 멈추면: `adb shell am force-stop ai.pleos.playground.caas`
@@ -87,6 +102,8 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 9. 기어 D가 되는 즉시(0 km/h) 사이드로드 앱은 "주행 중에는 사용할 수 없습니다"로 가려짐(DO meta-data 무시). 가려져도 프로세스·콜백은 유지.
 10. TTS: `addEventListener`는 `initialize` 성공 **후**(이전이면 SDK lateinit 크래시) / 로캘 `Locale.KOREA`(`ko`만 주면 엔진 오류 후 CaaS 멈춤) / `speak(text, isFinal=true)`(false면 다음 조각 대기로 안 끝남) / repo 필터는 `ai\.pleos\.playground(\..*)?`(TTS가 `security:universal-access`를 끌어옴).
 11. 앱이 백그라운드로 가면 ~10초 뒤 freezer로 콜백 끊김 (튜토리얼은 앞화면 전용이라 FGS 안 씀).
+12. D→P 복귀 시 `GEAR_SELECTION=P`가 주행 규제 해제보다 ~6ms 먼저 와서 게이트가 잠깐 `NotParked(주행 규제 중)`를 거친 뒤 `Parked` (로그 10-27 18:50:42.017~.024) → Phase 2 일시정지/재개 판정은 짧게 디바운스.
+13. 콘솔 "Trunk / Frunk Position" 기본 선택은 frunk(=HOOD) → trunk를 고르지 않으면 `TRUNK` 신호가 안 바뀜. 콘솔 카드 라벨(예: Gear Selection의 "Park")은 갱신이 늦을 수 있어 실제 반영은 로그로 확인.
 - 10/28 설명회 질문: ① `android.car.permission.CAR_POWERTRAIN` 등 AAOS 표준 퍼미션도 사전 승인 대상인지 ② TTS·STT 사용 허용·`TTS_SERVICE` 승인 ③ `CONTROL_CAR_LIGHTS` 승인 가능성 ④ 퍼미션 사전 승인 신청 절차 ⑤ PT 시연 장비(노트북+에뮬레이터) ⑥ DO 인정 방식(사이드로드 미인정).
 
 ## 8. 금지 사항
