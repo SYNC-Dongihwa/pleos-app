@@ -12,9 +12,9 @@
   - **상황별 코스 (10-27, `feat/tutorial-courses` → `main` 병합)**: 기본 조작 8 · 주유·충전 3(주유구=AAOS `FUEL_DOOR_OPEN`, 충전구=AAOS `EV_CHARGE_PORT_OPEN`, 보닛) · 비·김서림 4 · 추위·공조 6 · 아이·야간 3 + 전체. 엔진은 코스 순서(`order`)로 진행, 결과는 단계 id로 공유, 코스를 처음부터 하면 그 코스 결과만 지움. 홈 = 코스 카드(진행·이 차 미지원 수). 신호 25개(Pleos 23 + AAOS 2).
   - 검증(debug, 콘솔): `FINISH course=fuel [COMPLETED=2, UNSUPPORTED=1]`(주유구 `AAOS FUEL_DOOR_OPEN 속성 없음` → 충전구·보닛 완료) · weather 4/4 · climate 6/6 · family 3/3(창문 잠금 Area 수정 후). 기본 조작 7 + 미지원 1 → 전 코스 완료로 `master=true`. 단위 테스트 36개.
   - 오프닝: `opening/OpeningDirector` — 첫 실행 또는 홈·튜토리얼 시작 전에 운전석 문 0→1(콜백, 60초 쿨다운) → 환영 화면·음성 → 시작하기. 실내등은 `CONTROL_CAR_LIGHTS` 부여 시에만 `flashCabinLight`(capability 쓰기 확인 → 원래 값 get → ON → 4초 뒤 복구).
-  - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **APK는 아직 커밋 안 함** — 제출 직전 최종본만 커밋(41MB, 이력 비대 방지). 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
+  - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **10-27 제출용 APK 커밋**(41MB) — 앱 코드를 바꾸면 다시 빌드해 교체 커밋. 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
   - 시연: `docs/demo-scenario.md` + `tools/vc-demo.js`(`__demo.reset/door/run`) — release APK로 11단계 완주 2분 10초 실측.
-- **남은 일**: ① Playground에서 퍼미션 사전 승인 신청(§5, 사용자) ② 10/28 설명회 질문(§7 끝) ③ 시연 영상 녹화·기획서(MAU·Retention) ④ 제출 직전 최종 APK 커밋 + README 확인 ⑤ (선택) STT 음성 명령 "다음/다시/건너뛰기" — `RECORD_AUDIO`·STT 퍼미션 승인 필요, 미실측.
+- **남은 일**: ① Playground에서 퍼미션 사전 승인 신청(§5, 사용자) ② 10/28 설명회 질문(§7 끝) ③ 시연 영상 녹화(선택, 가산점 — 찍으면 `[수정제출]`) ④ 접수: 접수양식은 repo 밖에서 관리(개인정보 포함), 04 서명 후 이메일 제출 ⑤ (선택) STT 음성 명령 "다음/다시/건너뛰기" — `RECORD_AUDIO`·STT 퍼미션 승인 필요, 미실측.
   - 기반: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(신호 12개, `state` + 합쳐지지 않는 `changes`) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate` · 숨김 개발자 패널(제목 5탭).
   - 튜토리얼: `tutorial/TutorialSteps`(단계 = 데이터, 11단계) → `TutorialEngine`(순수 Kotlin 상태 기계, 효과 Speak/Log/Save 반환) → `TutorialController`(단일 스레드, 정차 복귀 800ms 디바운스, 1초 tick) · `ProgressStore`(DataStore) · `voice/SpeechGuide`(Pleos TTS, 새 안내가 이전 안내를 끊음) · 화면 `TutorialScreen`/`FinishScreen`/`HomeScreen`.
 - 일정: 접수 마감 11/15 23:59 (11/14 제출 목표). 10/28 설명회 질문은 §7 끝.
@@ -173,3 +173,4 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 - 사용하지 않는 퍼미션 선언 금지. 차량 제어(set)는 MVP에서 사용 금지.
 - 실명·개인정보를 코드·README·커밋에 넣지 않는다. 키·토큰·키스토어(`*.jks`, `keystore.properties`)·Playground 시크릿 커밋 금지(`local.properties`/환경변수 → `BuildConfig`).
 - 커밋은 repo-local 익명 identity로만 (`git config user.name` = `SYNC-Dongihwa`, 전역 설정 사용 금지). 기능 단위로 작게, Phase 끝마다 빌드 통과.
+- 저장소는 **공개**(10-27, 블라인드 심사용으로 새로 만듦). 푸시는 익명 계정 `anonymity-repo`로만 — GitHub Activity 화면에 푸시한 계정이 공개됨. repo-local `credential.helper`가 `gh auth token --user anonymity-repo`를 써서 gh 활성 계정과 무관하게 그 계정으로 푸시된다(다른 PC에서는 같은 설정 필요). `gh` API로 저장소를 바꿀 때는 활성 계정을 먼저 확인.
