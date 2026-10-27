@@ -1,0 +1,42 @@
+package com.teamsync.pleos
+
+import android.app.Application
+import com.teamsync.pleos.car.AaosCarMonitor
+import com.teamsync.pleos.car.GateState
+import com.teamsync.pleos.car.ParkingGate
+import com.teamsync.pleos.log.AppLog
+import com.teamsync.pleos.vehicle.VehicleStateRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
+
+/**
+ * 앱 프로세스 단위 객체. SDK 구독은 프로세스 동안 한 번만 등록한다 —
+ * 화면 단위로 등록·해제하면 같은 속성 구독이 앱 전체에서 지워지는 SDK 동작(CLAUDE.md §7-4)에 걸린다.
+ */
+object AppGraph {
+    lateinit var vehicle: VehicleStateRepository
+        private set
+    lateinit var car: AaosCarMonitor
+        private set
+    lateinit var gate: StateFlow<GateState>
+        private set
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    fun init(app: Application) {
+        car = AaosCarMonitor(app).also { it.start() }
+        vehicle = VehicleStateRepository(app).also { it.start() }
+        gate = car.state
+            .map(ParkingGate::evaluate)
+            .distinctUntilChanged()
+            .onEach { AppLog.i("Gate", "gate → $it") }
+            .stateIn(scope, SharingStarted.Eagerly, GateState.Unknown("시작 중"))
+    }
+}
