@@ -7,19 +7,31 @@ import ai.pleos.playground.tts.listener.EventListener
 import ai.pleos.playground.tts.listener.OnInitializeListener
 import android.content.Context
 import com.teamsync.pleos.log.AppLog
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.Locale
 
 /**
- * 음성 안내 (화면을 볼 수 없는 순간용 — 예: 2차 사고 대피). Pleos TextToSpeech SDK 온디바이스 모드.
+ * 튜토리얼 음성 안내. Pleos TextToSpeech SDK 온디바이스 모드 (앱 등록·네트워크 불필요).
  *
- * 실측(2026-10-22): Android 표준 `android.speech.tts.TextToSpeech`는 엔진(ai.pleos.playground.caas)이 보이고
- * `pleos.car.permission.TTS_SERVICE`를 선언해도 초기화 status=-1로 실패 → Pleos SDK(문서상 "준비 중", Maven엔 3.3.1 공개)를 사용.
- * 에뮬레이터 실측: 모델 로드 0.4~0.9s(첫 호출), 문장 3.8s 분량 합성 0.29s, 요청→재생 시작 약 0.5s. 화자 seoyoon.
+ * 실측 규칙 (CLAUDE.md §7-10): addEventListener는 initialize 성공 후 / 로캘은 Locale.KOREA / speak(text, isFinal=true).
+ * Android 표준 TextToSpeech는 에뮬레이터에서 초기화 status=-1로 실패해 쓰지 않는다.
+ * 초기화에 실패하면 [status]에 이유를 남기고 화면 안내만 한다 (대체 음성 없음).
  */
 class SpeechGuide(context: Context) {
 
-    @Volatile private var ready = false
-    private val pending = ArrayDeque<String>()
+    sealed interface Status {
+        data object Initializing : Status
+        data object Ready : Status
+        data class Failed(val reason: String) : Status
+    }
+
+    private val _status = MutableStateFlow<Status>(Status.Initializing)
+    val status: StateFlow<Status> = _status.asStateFlow()
+
+    /** 초기화 전에 들어온 안내는 마지막 것만 기억 (새 안내가 이전 안내를 대체). */
+    @Volatile private var pending: String? = null
 
     private val tts = TextToSpeech(context.applicationContext, Mode.ON_DEVICE)
 
@@ -29,53 +41,51 @@ class SpeechGuide(context: Context) {
             tts.initialize(object : OnInitializeListener {
                 override fun onSuccess() {
                     AppLog.i(TAG, "initialize onSuccess")
-                    // 실측: initialize 전에 addEventListener를 부르면 SDK 내부 lateinit 미초기화로 크래시
                     tts.addEventListener(object : EventListener {
-                        override fun onStart() = AppLog.i(TAG, "event onStart")
-                        override fun onReady() = AppLog.i(TAG, "event onReady")
-                        override fun onDone() = AppLog.i(TAG, "event onDone")
+                        override fun onStart() = AppLog.d(TAG, "event onStart")
+                        override fun onReady() = AppLog.d(TAG, "event onReady")
+                        override fun onDone() = AppLog.d(TAG, "event onDone")
                         override fun onError(error: ErrorType) = AppLog.e(TAG, "event onError $error")
-                        override fun onStop() = AppLog.i(TAG, "event onStop")
+                        override fun onStop() = AppLog.d(TAG, "event onStop")
                         override fun onUpdatedRms(rms: Double) = Unit
                     })
-                    // 실측: Locale.KOREAN("ko") → 엔진이 "unsupported locale: ko-"로 ON_DEVICE_ENGINE_ERROR. 국가 코드까지 필요
                     runCatching { tts.setLocale(Locale.KOREA) }
                         .onFailure { AppLog.w(TAG, "setLocale(ko_KR) failed: ${it.message}") }
-                    ready = true
-                    synchronized(pending) { while (pending.isNotEmpty()) speakNow(pending.removeFirst()) }
+                    _status.value = Status.Ready
+                    pending?.let { pending = null; speakNow(it, interrupt = false) }
                 }
 
                 override fun onFailure(error: ErrorType) {
                     AppLog.e(TAG, "initialize onFailure $error")
+                    _status.value = Status.Failed("초기화 실패: $error")
                 }
             })
         } catch (e: Exception) {
             AppLog.e(TAG, "initialize threw ${e.javaClass.name}: ${e.message}", e)
+            _status.value = Status.Failed("초기화 예외: ${e.message}")
         }
     }
 
-    fun speak(text: String) {
-        if (!ready) {
-            synchronized(pending) { pending.addLast(text) }
-            AppLog.i(TAG, "queued until TTS ready: '$text'")
-            return
+    /** [interrupt]=true면 말하던 안내를 멈추고 새 안내를 말한다 (튜토리얼은 항상 최신 안내가 중요). */
+    fun speak(text: String, interrupt: Boolean = true) {
+        when (_status.value) {
+            Status.Ready -> speakNow(text, interrupt)
+            Status.Initializing -> {
+                pending = text
+                AppLog.i(TAG, "queued until ready: '$text'")
+            }
+            is Status.Failed -> AppLog.w(TAG, "not speaking (TTS unavailable): '$text'")
         }
-        speakNow(text)
     }
 
-    private fun speakNow(text: String) {
+    private fun speakNow(text: String, interrupt: Boolean) {
         try {
-            // 2번째 인자 = isFinal (스트리밍 TTS: 조각을 이어 보내고 마지막에 true). false면 엔진이 다음 조각을 기다리며 멈춤 (실측)
+            if (interrupt) tts.stop()
             tts.speak(text, true)
             AppLog.i(TAG, "speak('$text')")
         } catch (e: Exception) {
             AppLog.e(TAG, "speak threw ${e.javaClass.name}: ${e.message}", e)
         }
-    }
-
-    fun shutdown() {
-        runCatching { tts.release() }
-        AppLog.i(TAG, "release")
     }
 
     companion object {

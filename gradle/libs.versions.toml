@@ -7,6 +7,7 @@ lifecycle = "2.8.7"
 composeBom = "2024.12.01"
 coroutines = "1.8.1"
 junit = "4.13.2"
+datastore = "1.1.1"
 pleosVehicle = "2.3.2"
 # Vehicle 2.3.2가 runtime 스코프로만 노출 → ErrorCode 등을 컴파일 타임에 쓰려면 명시 필요. Vehicle 버전 올릴 때 POM 보고 같이 맞출 것.
 pleosVehicleData = "1.1.11"
@@ -25,6 +26,7 @@ androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-toolin
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
 pleos-vehicle = { group = "ai.pleos.playground", name = "Vehicle", version.ref = "pleosVehicle" }
 pleos-vehicle-data = { group = "ai.pleos.playground", name = "vehicle-data", version.ref = "pleosVehicleData" }
 pleos-tts = { group = "ai.pleos.playground", name = "TextToSpeech", version.ref = "pleosTts" }
