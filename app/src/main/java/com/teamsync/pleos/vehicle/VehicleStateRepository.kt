@@ -627,13 +627,19 @@ class VehicleStateRepository(private val context: Context) {
         update(s) { it.copy(support = Support.Unsupported(reason)) }
     }
 
-    /** capability 콜백이 끝내 안 오면 '확인 중'에 영원히 머무른다 → 시간 초과를 미지원 사유로 기록. */
+    /**
+     * capability 콜백이 끝내 안 오면 '확인 중'에 영원히 머무른다 → 시간 초과를 미지원 사유로 기록.
+     * 확인과 변경을 한 번의 `update`로 한다: 응답(binder 스레드)이 같은 순간에 오면 Supported를 덮어쓰던 문제 (§7-20).
+     * 시간 초과 뒤에 늦게 온 응답은 [onCapability]가 다시 Supported로 바꾼다.
+     */
     private fun armCapabilityTimeout(s: VehicleSignal, gen: Int) {
         scope.launch {
             delay(CAPABILITY_TIMEOUT_MS)
-            if (gen == generation && _state.value[s].support == Support.Checking) {
-                unsupported(s, "capability 응답 없음 (${CAPABILITY_TIMEOUT_MS / 1000}초)")
-            }
+            if (gen != generation) return@launch
+            val reason = "capability 응답 없음 (${CAPABILITY_TIMEOUT_MS / 1000}초)"
+            var marked = false
+            _state.update { st -> timedOut(st, s, reason).also { marked = it != null } ?: st }
+            if (marked) AppLog.w(TAG, "UNSUPPORTED ${s.name}: $reason")
         }
     }
 
@@ -653,6 +659,14 @@ class VehicleStateRepository(private val context: Context) {
             ErrorCode.ERROR_NOT_SUPPORTED_AREA,
             ErrorCode.ERROR_NOT_SUPPORTED_VALUE_TYPE,
         )
+
+        /** 시간 초과 판정: 아직 '확인 중'일 때만 미지원으로 바꾼 상태, 그 사이 응답으로 바뀌었으면 null (그대로 둠). */
+        internal fun timedOut(st: VehicleState, s: VehicleSignal, reason: String): VehicleState? =
+            if (st[s].support == Support.Checking) {
+                st.copy(signals = st.signals + (s to st[s].copy(support = Support.Unsupported(reason))))
+            } else {
+                null
+            }
 
         /** [target] 값을 포함하는 Area 중 가장 좁은 것 (운전석 단독 Area가 있으면 그것, 없으면 묶음 Area). */
         internal fun <A> pick(areas: Collection<A>, values: (A) -> Array<out Any>, target: Any): A? =

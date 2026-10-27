@@ -10,7 +10,7 @@
 ## 2. 현재 상태
 - **Phase 1·2·3 완료 10-27** (Phase 3: 오프닝·release 서명·시연 시나리오·README, STT는 선택이라 보류). `feat/car-tutorial`을 10-27 `main`에 fast-forward 병합 → 작업 기준은 `main`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
   - **상황별 코스 (10-27, `feat/tutorial-courses` → `main` 병합)**: 기본 조작 8 · 주유·충전 3(주유구=AAOS `FUEL_DOOR_OPEN`, 충전구=AAOS `EV_CHARGE_PORT_OPEN`, 보닛) · 비·김서림 4 · 추위·공조 6 · 아이·야간 3 + 전체. 엔진은 코스 순서(`order`)로 진행, 결과는 단계 id로 공유, 코스를 처음부터 하면 그 코스 결과만 지움. 홈 = 코스 카드(진행·이 차 미지원 수). 신호 25개(Pleos 23 + AAOS 2).
-  - 검증(debug, 콘솔): `FINISH course=fuel [COMPLETED=2, UNSUPPORTED=1]`(주유구 `AAOS FUEL_DOOR_OPEN 속성 없음` → 충전구·보닛 완료) · weather 4/4 · climate 6/6 · family 3/3(창문 잠금 Area 수정 후). 기본 조작 7 + 미지원 1 → 전 코스 완료로 `master=true`. 단위 테스트 36개.
+  - 검증(debug, 콘솔): `FINISH course=fuel [COMPLETED=2, UNSUPPORTED=1]`(주유구 `AAOS FUEL_DOOR_OPEN 속성 없음` → 충전구·보닛 완료) · weather 4/4 · climate 6/6 · family 3/3(창문 잠금 Area 수정 후). 기본 조작 7 + 미지원 1 → 전 코스 완료로 `master=true`. 단위 테스트 41개(10-27 capability 시간 초과 경합 수정 +5).
   - 오프닝: `opening/OpeningDirector` — 첫 실행 또는 홈·튜토리얼 시작 전에 운전석 문 0→1(콜백, 60초 쿨다운) → 환영 화면·음성 → 시작하기. 실내등은 `CONTROL_CAR_LIGHTS` 부여 시에만 `flashCabinLight`(capability 쓰기 확인 → 원래 값 get → ON → 4초 뒤 복구).
   - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **10-27 제출용 APK 커밋**(41MB) — 앱 코드를 바꾸면 다시 빌드해 교체 커밋. 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
   - 시연: `docs/demo-scenario.md` + `tools/vc-demo.js`(`__demo.reset/door/run`) — release APK로 11단계 완주 2분 10초 실측.
@@ -163,6 +163,8 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 16. 창문 잠금: 콘솔 Window Lock(all)은 `WINDOW_LOCK areaId=1360`(전체 묶음)으로 발행, 단독 ROW_2_LEFT 구독은 SDK가 걸러 콜백 없음. rear_left 선택은 이벤트 자체가 없음 (로그 `[Pleos][SDK]a onChangeEvent … areaId = 1360`, 10-27).
 17. 에뮬레이터: 콘솔 실내등 On 시 뒷좌석 독서등도 ON, 독서등 카드 On/Off 반영이 엇갈려 보임 → 앱은 시작 시점 값 기준 전이로 판정해 진행에 문제없음. `FUEL_DOOR_OPEN`은 config 자체가 없음(EV).
 18. 콘솔 버튼을 눌러도 가끔 발행되지 않는다 (10-27: 기본 조작 첫 Low beam 클릭 때 Vehicle 서비스 로그 `LOW_BEAM_LIGHTS_STATE` 0건, 다시 누르니 정상). 앱이 안 넘어가면 먼저 `adb logcat | grep "[Pleos]u"`로 서비스에 이벤트가 왔는지 확인.
+19. 방향지시등을 켜면 시스템(`ai.umos.car.evs`, user 0이 실행)이 **후측방 카메라 화면**(`CarEvsBlindSpotCameraPreviewActivity`)을 앱 위에 띄운다 — 실차 BVM 재현. 앱은 가려진 채로도 판정 정상(10-27 로그). 에뮬레이터에선 꺼진 뒤에도 안 닫히고 `drivingview`·evs ANR + 부하 → 신호 전달 수십 초 지연. 녹화 때만 `pm disable-user --user 0/10 ai.umos.car.evs`, 끝나면 `pm enable`.
+20. **(10-27 수정)** capability 응답이 5초 시간 초과와 같은 순간에 오면 `armCapabilityTimeout`이 Supported를 Unsupported로 덮어썼다(RECIRCULATION: `CAP` 1ms 뒤 `UNSUPPORTED`, 부팅 직후 서비스 응답 ~13초일 때). → 확인·변경을 `_state.update` 한 번으로(`timedOut()`: Checking일 때만), `CapabilityTimeoutTest` 5개. 늦게 온 응답은 원래대로 Supported로 복구.
 - 10/28 설명회 질문: ① `android.car.permission.CAR_POWERTRAIN` 등 AAOS 표준 퍼미션도 사전 승인 대상인지 ② TTS·STT 사용 허용·`TTS_SERVICE` 승인 ③ `CONTROL_CAR_LIGHTS` 승인 가능성 ④ 퍼미션 사전 승인 신청 절차 ⑤ PT 시연 장비(노트북+에뮬레이터) ⑥ DO 인정 방식(사이드로드 미인정).
 
 ## 8. 금지 사항
