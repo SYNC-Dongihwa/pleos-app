@@ -1,4 +1,4 @@
-package com.teamsync.pleos.core
+package com.teamsync.pleos.voice
 
 import ai.pleos.playground.tts.TextToSpeech
 import ai.pleos.playground.tts.constant.ErrorType

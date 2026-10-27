@@ -6,49 +6,18 @@
         android:required="true" />
 
     <!--
-        SDK Probe 단계: 모든 도메인의 조회(check/get/register) API를 호출하므로 조회 퍼미션 전체를 선언한다.
-        퍼미션 목록은 AAR Impl 클래스의 @RequiresCustomPermission 집계 결과 (CLAUDE.md §9 2026-10-22).
-        ⚠️ 실제 앱 기능이 정해지면 쓰는 것만 남길 것 (미사용 퍼미션 = 앱마켓 심사 반려 사유).
+        튜토리얼 단계가 구독하는 Vehicle SDK 조회 퍼미션만 선언한다 (CLAUDE.md §5 체크리스트).
+        App Market 사전 승인 대상 — 단계를 추가·삭제하면 이 목록과 체크리스트를 같이 고칠 것.
     -->
-    <uses-permission android:name="pleos.car.permission.CAR_CLIMATE" />   <!-- HVAC, SteeringWheel 열선 -->
-    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />     <!-- Door -->
-    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />     <!-- Brake, DrivingMode, Gear, Odometer, SteeringWheel 각도 -->
-    <uses-permission android:name="pleos.car.permission.CAR_ENERGY" />    <!-- EvBattery, Fuel -->
-    <uses-permission android:name="pleos.car.permission.CAR_INFO" />      <!-- CarInfo, Display, EvBattery 용량 -->
-    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />    <!-- Light, TurnSignal -->
-    <uses-permission android:name="pleos.car.permission.CAR_MIRRORS" />   <!-- SideMirror -->
-    <uses-permission android:name="pleos.car.permission.CAR_SAFETY" />    <!-- Safety, Tire -->
-    <uses-permission android:name="pleos.car.permission.CAR_SEATS" />     <!-- Seat -->
-    <uses-permission android:name="pleos.car.permission.CAR_TOLL" />      <!-- Toll -->
-    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />   <!-- Window, Wiper -->
-    <!-- PRIVATE_*: 3rd-party 앱에 부여되는지 확인용 (CarInfo.getCapabilityInfo, Safety 경고등, Tire 공기압) -->
-    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_INFO" />
-    <uses-permission android:name="pleos.car.permission.PRIVATE_CAR_SAFETY" />
-    <!-- NaviHelper get*Info() -->
-    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
-    <!-- NaviHelper requestRoute()/requestRouteWithWaypoints()/addWaypoint()/removeWaypoint()/cancelRoute() -->
-    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
-
-    <!--
-        AAOS 표준 차량 속성 (Pleos SDK에 없는 신호, 진단용): 차속은 CAR_SPEED(dangerous, 런타임 허용),
-        주차 브레이크·기어는 CAR_POWERTRAIN(normal), 야간·외기온도는 CAR_EXTERIOR_ENVIRONMENT(normal).
-        비상등(CAR_EXTERIOR_LIGHTS)은 signature라 서드파티 불가 → 선언하지 않음.
-        ⚠️ 앱마켓 심사에서 허용되는지 미확인 — 기능 확정 시 사용 여부 결정.
-    -->
-    <uses-permission android:name="android.car.permission.CAR_SPEED" />
-    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
-    <uses-permission android:name="android.car.permission.CAR_EXTERIOR_ENVIRONMENT" />
-
-    <!--
-        Pleos TextToSpeech SDK(온디바이스 음성 안내). SDK의 ApiChecker가 initialize/speak 시 확인 —
-        없으면 SecurityException (실측 2026-10-22). normal 권한이라 설치 시 자동 부여.
-    -->
+    <uses-permission android:name="pleos.car.permission.CAR_LIGHTS" />   <!-- 전조등·상향등·방향지시등 -->
+    <uses-permission android:name="pleos.car.permission.CAR_WINDOWS" />  <!-- 창문·와이퍼 -->
+    <uses-permission android:name="pleos.car.permission.CAR_CLIMATE" />  <!-- A/C·온도·핸들 열선 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />    <!-- 도어 잠금·트렁크·운전석 문 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />    <!-- 주행 모드 -->
+    <!-- Pleos TextToSpeech: SDK ApiChecker가 확인, 없으면 SecurityException (2026-10-22 실측) -->
     <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
-
-    <!-- 상시 수신 Foreground Service (Android 14: 타입별 권한 필요) + 주행 알림 -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- AAOS 표준 GEAR_SELECTION·PARKING_BRAKE_ON (정차 게이트). Pleos 문서: 기어 등 표준 데이터는 AAOS Car API로 -->
+    <uses-permission android:name="android.car.permission.CAR_POWERTRAIN" />
 
     <application
         android:name=".PleosApp"
@@ -56,7 +25,7 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-        <!-- 홈: DO 선언 → 주행 중에도 표시, 대신 CarUxRestrictions로 화면을 직접 줄인다 -->
+        <!-- 정차 중에만 쓰는 앱이라 DO를 선언하지 않는다: 주행 중엔 시스템이 화면을 가리고, 앱은 정차 게이트로 일시정지 -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -65,22 +34,6 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            <meta-data
-                android:name="distractionOptimized"
-                android:value="true" />
         </activity>
-        <!-- SDK Probe: DO 미선언 (텍스트 과다 → 주행 중 시스템이 가림) -->
-        <activity
-            android:name=".ProbeActivity"
-            android:exported="false" />
-
-        <service
-            android:name=".service.MonitorService"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps receiving vehicle state (warning lights, battery) and navigation events while another app such as Navigation is in front, to show glanceable driver alerts." />
-        </service>
     </application>
 </manifest>

@@ -16,25 +16,26 @@ import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
- * 앱 공통 로그 래퍼 (CLAUDE.md §0 로깅 규칙).
+ * 앱 공통 로그 래퍼. 기록 대상: SDK 연결, capability 결과, 콜백 등록·해제, 수신 값, 예외.
  *
- * - logcat: 태그 `PLEOS/<tag>`
+ * - logcat: 태그 `SYNC/<tag>` (확인: `adb logcat -v time | grep "SYNC/"`)
  * - 파일: `filesDir/logs/app-YYYYMMDD.log`, 파일당 [MAX_FILE_BYTES] 초과 시 `app-YYYYMMDD-N.log`로 롤링,
  *   디렉터리 합계 [MAX_DIR_BYTES] 초과 시 오래된 파일부터 삭제
- * - 화면 표시용으로 최근 [TAIL_SIZE]줄을 [tail]로 노출
+ * - 개발자 패널용으로 최근 경고·오류 [ERROR_KEEP]개를 [errors]로 노출
  *
  * API 키/시크릿은 절대 메시지에 넣지 말 것.
  */
 object AppLog {
-    const val PREFIX = "PLEOS/"
+    const val PREFIX = "SYNC/"
     private const val MAX_FILE_BYTES = 2L * 1024 * 1024
     private const val MAX_DIR_BYTES = 20L * 1024 * 1024
-    private const val TAIL_SIZE = 400
+    private const val ERROR_KEEP = 50
 
     data class Entry(val time: Long, val level: Char, val tag: String, val message: String)
 
-    private val _tail = MutableStateFlow<List<Entry>>(emptyList())
-    val tail: StateFlow<List<Entry>> = _tail.asStateFlow()
+    private val _errors = MutableStateFlow<List<Entry>>(emptyList())
+    /** 최근 W/E 로그, 최신이 마지막. */
+    val errors: StateFlow<List<Entry>> = _errors.asStateFlow()
 
     @Volatile
     private var logDir: File? = null
@@ -65,8 +66,10 @@ object AppLog {
 
         val now = System.currentTimeMillis()
         val levelChar = levelChar(level)
-        val shown = if (tr != null) "$msg | ${tr.javaClass.simpleName}: ${tr.message}" else msg
-        _tail.update { (it + Entry(now, levelChar, fullTag, shown)).takeLast(TAIL_SIZE) }
+        if (level >= Log.WARN) {
+            val shown = if (tr != null) "$msg | ${tr.javaClass.simpleName}: ${tr.message}" else msg
+            _errors.update { (it + Entry(now, levelChar, fullTag, shown)).takeLast(ERROR_KEEP) }
+        }
 
         val dir = logDir ?: return
         val thread = Thread.currentThread().name
