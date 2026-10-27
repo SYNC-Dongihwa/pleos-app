@@ -33,8 +33,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -52,6 +55,10 @@ class VehicleStateRepository(private val context: Context) {
 
     private val _state = MutableStateFlow(VehicleState())
     val state: StateFlow<VehicleState> = _state.asStateFlow()
+
+    private val _changes = MutableSharedFlow<SignalChange>(extraBufferCapacity = 64)
+    /** 값이 바뀔 때마다 하나씩 (합쳐지지 않음). 튜토리얼 전이 판정용. */
+    val changes: SharedFlow<SignalChange> = _changes.asSharedFlow()
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     @Volatile private var vehicle: Vehicle? = null
@@ -341,8 +348,9 @@ class VehicleStateRepository(private val context: Context) {
     private fun publish(s: VehicleSignal, value: Any?, source: String) {
         val now = System.currentTimeMillis()
         val before = _state.value[s].value
+        val changed = before != value || _state.value[s].receiveCount == 0
         // 주기 콜백은 같은 값이 1~3초마다 반복됨 (§7-6) → 바뀔 때만 로그
-        if (before != value || _state.value[s].receiveCount == 0) AppLog.i(TAG, "VAL ${s.name} = $value ($source)")
+        if (changed) AppLog.i(TAG, "VAL ${s.name} = $value ($source)")
         update(s) {
             it.copy(
                 value = value,
@@ -351,6 +359,9 @@ class VehicleStateRepository(private val context: Context) {
                 receivedAt = now,
                 receiveCount = it.receiveCount + 1,
             )
+        }
+        if (changed && !_changes.tryEmit(SignalChange(s, before, value, source, now))) {
+            AppLog.w(TAG, "change buffer full, dropped ${s.name} $before→$value")
         }
     }
 

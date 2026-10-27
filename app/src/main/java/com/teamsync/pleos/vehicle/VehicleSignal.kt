@@ -46,6 +46,19 @@ data class SignalState(
     val lastError: String? = null,
 )
 
+/**
+ * 값이 바뀐 순간 하나. StateFlow는 빠른 연속 변화를 합쳐 버릴 수 있어서, 전이 판정용으로 따로 흘려보낸다.
+ * 첫 값(기준값)은 [previous]=null.
+ */
+data class SignalChange(
+    val signal: VehicleSignal,
+    val previous: Any?,
+    val value: Any?,
+    /** "get" 또는 "live". 완료 판정은 "live"(콜백)만 쓴다. */
+    val source: String,
+    val time: Long,
+)
+
 sealed interface VehicleConnection {
     data object NotStarted : VehicleConnection
     data object Connected : VehicleConnection
