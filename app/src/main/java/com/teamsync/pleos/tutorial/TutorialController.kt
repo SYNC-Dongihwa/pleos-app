@@ -27,15 +27,20 @@ class TutorialController(
     private val speech: SpeechGuide,
     private val store: ProgressStore,
 ) {
-    private val engine = TutorialEngine(TutorialSteps.all)
+    private val engine = TutorialEngine(TutorialSteps.all, TutorialSteps.courses + TutorialSteps.everything)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default.limitedParallelism(1))
 
     private val _state = MutableStateFlow(engine.state)
     val state: StateFlow<TutorialState> = _state.asStateFlow()
 
     val steps: List<TutorialStep> get() = engine.steps
+    /** 상황별 코스 (홈 카드). 전체 진행은 [everything]. */
+    val courses: List<Course> get() = TutorialSteps.courses
+    val everything: Course get() = TutorialSteps.everything
     val isMaster: Boolean get() = engine.isMaster
-    val allResolved: Boolean get() = engine.allResolved
+    fun course(id: String): Course? = engine.course(id)
+    fun isCourseComplete(id: String): Boolean = engine.isCourseComplete(id)
+    fun isCourseResolved(id: String): Boolean = engine.isCourseResolved(id)
 
     init {
         scope.launch {
@@ -58,12 +63,12 @@ class TutorialController(
         }
     }
 
-    fun start(fromBeginning: Boolean) = act("start(fromBeginning=$fromBeginning)") { engine.start(fromBeginning, it) }
+    fun start(courseId: String, fromBeginning: Boolean) = act("start($courseId, fromBeginning=$fromBeginning)") { engine.start(courseId, fromBeginning, it) }
     fun skip() = act("skip") { engine.skip(it) }
     fun repeat() = act("repeat") { engine.repeat() }
     fun quit() = act("quit") { engine.quit() }
     fun retry(stepId: String) = act("retry($stepId)") { engine.retry(stepId, it) }
-    fun showResults() = act("showResults") { engine.showResults() }
+    fun showResults(courseId: String) = act("showResults($courseId)") { engine.showResults(courseId) }
 
     private fun act(name: String, block: (Long) -> List<Effect>) {
         AppLog.i(TAG, "UI $name")

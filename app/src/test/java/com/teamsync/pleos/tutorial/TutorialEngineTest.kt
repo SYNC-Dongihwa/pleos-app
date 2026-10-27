@@ -36,12 +36,15 @@ class TutorialEngineTest {
         valueLabel = { it.toString() },
     )
 
+    private val all = Course("all", "전체", "", listOf("light", "temp", "mode"))
+    private val onlyTemp = Course("climate", "추위·공조", "", listOf("temp"))
+
     private lateinit var engine: TutorialEngine
     private var now = 1_000L
     private var vehicle = VehicleState(connection = VehicleConnection.Connected)
 
     @Before fun setUp() {
-        engine = TutorialEngine(listOf(light, temp, mode))
+        engine = TutorialEngine(listOf(light, temp, mode), listOf(all, onlyTemp))
         set(VehicleSignal.LOW_BEAM, "OFF")
         set(VehicleSignal.DRIVER_TEMPERATURE, 22.0f)
         vehicle = vehicle.copy(signals = vehicle.signals + (VehicleSignal.DRIVING_MODE to SignalState(support = Support.Unsupported("ERROR_NOT_SUPPORTED_PROPERTY"))))
@@ -63,14 +66,14 @@ class TutorialEngineTest {
     private fun spoken(effects: List<Effect>) = effects.filterIsInstance<Effect.Speak>().map { it.text }
 
     @Test fun `처음 값이 꺼짐이면 켜기 안내로 시작`() {
-        val fx = engine.start(fromBeginning = true, now)
+        val fx = engine.start("all", fromBeginning = true, now)
         assertEquals(Mode.Running, engine.state.mode)
         assertEquals("켜 보세요", engine.state.instruction)
         assertTrue(spoken(fx).single().endsWith("켜 보세요"))
     }
 
     @Test fun `켜기와 되돌리기 전이를 모두 관찰해야 완료`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         assertEquals(1, engine.state.phaseIndex)
         assertEquals("다시 꺼 주세요", engine.state.instruction)
@@ -81,13 +84,13 @@ class TutorialEngineTest {
     }
 
     @Test fun `get으로 온 변화는 완료 판정에 쓰지 않는다`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON", source = "get")
         assertEquals(0, engine.state.phaseIndex)
     }
 
     @Test fun `온도는 1도 이상 내려가야 다음 단계`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         change(VehicleSignal.LOW_BEAM, "ON", "OFF")
         change(VehicleSignal.DRIVER_TEMPERATURE, 22.0f, 21.5f)
@@ -99,7 +102,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `미지원 단계는 사유와 함께 자동으로 넘어가고 끝나면 완료 화면`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         engine.skip(now)
         engine.skip(now)
         assertEquals(Outcome.UNSUPPORTED, engine.state.results["mode"]?.outcome)
@@ -109,7 +112,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `20초 변화가 없으면 힌트를 한 번만`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         assertTrue(spoken(engine.tick(now + 19_000)).isEmpty())
         assertEquals(listOf("레버 힌트"), spoken(engine.tick(now + 20_000)))
         assertTrue(spoken(engine.tick(now + 60_000)).isEmpty())
@@ -117,7 +120,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `목표에 못 미친 변화도 힌트 타이머를 다시 시작`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         change(VehicleSignal.LOW_BEAM, "ON", "OFF") // 온도 단계 시작 (now 기준)
         val begun = now
@@ -129,7 +132,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `주행 전환 시 일시정지, 그동안 변화는 판정 안 함, 재개 시 안내 반복`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         val paused = engine.onGate(parked = false, reason = "기어 D", now)
         assertEquals(Mode.Paused("기어 D"), engine.state.mode)
         assertTrue(spoken(paused).single().contains("잠시 멈출게요"))
@@ -144,7 +147,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `멈춘 동안 바뀐 값은 재개 시점의 새 기준이 된다`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         change(VehicleSignal.LOW_BEAM, "ON", "OFF") // 온도 단계
         engine.onGate(parked = false, reason = "기어 D", now)
@@ -163,7 +166,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `건너뛰기는 건너뜀으로 기록`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         engine.skip(now)
         assertEquals(Outcome.SKIPPED, engine.state.results["light"]?.outcome)
         assertEquals("temp", engine.steps[engine.state.stepIndex].id)
@@ -171,12 +174,12 @@ class TutorialEngineTest {
 
     @Test fun `정차가 아니면 시작하지 않는다`() {
         engine.onGate(parked = false, reason = "기어 D", now)
-        engine.start(true, now)
+        engine.start("all", true, now)
         assertEquals(Mode.Idle, engine.state.mode)
     }
 
     @Test fun `완료 화면에서 한 단계만 다시 하기`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         engine.skip(now)
         engine.skip(now) // temp 건너뜀 → mode 미지원 → Finished
         assertEquals(Mode.Finished, engine.state.mode)
@@ -189,7 +192,7 @@ class TutorialEngineTest {
     }
 
     @Test fun `다시 해보기 도중 그만두면 이전 결과가 남는다`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         change(VehicleSignal.LOW_BEAM, "ON", "OFF")
         val before = engine.state.results["light"]
@@ -202,12 +205,44 @@ class TutorialEngineTest {
 
     @Test fun `이어서 하기는 결과가 없는 단계부터`() {
         engine.restore(mapOf("light" to StepResult(Outcome.COMPLETED, "OFF → ON, ON → OFF")))
-        engine.start(fromBeginning = false, now)
+        engine.start("all", fromBeginning = false, now)
         assertEquals("temp", engine.steps[engine.state.stepIndex].id)
     }
 
+    @Test fun `코스는 그 코스의 단계만 진행하고 위치는 코스 기준`() {
+        val fx = engine.start("climate", fromBeginning = true, now)
+        assertEquals("temp", engine.steps[engine.state.stepIndex].id)
+        assertEquals(0, engine.state.coursePos)
+        assertEquals(1, engine.state.courseSize)
+        assertTrue(spoken(fx).single().startsWith("추위·공조 코스를 시작할게요."))
+        change(VehicleSignal.DRIVER_TEMPERATURE, 22.0f, 21.0f)
+        change(VehicleSignal.DRIVER_TEMPERATURE, 21.0f, 22.0f)
+        assertEquals(Mode.Finished, engine.state.mode)
+        assertEquals("climate", engine.state.courseId)
+        assertTrue(engine.isCourseComplete("climate"))
+        assertFalse(engine.isMaster) // 전조등은 아직
+        assertNull(engine.state.results["light"])
+    }
+
+    @Test fun `코스를 처음부터 하면 그 코스 결과만 지운다`() {
+        engine.restore(
+            mapOf(
+                "light" to StepResult(Outcome.COMPLETED, "OFF → ON, ON → OFF"),
+                "temp" to StepResult(Outcome.SKIPPED, "사용자가 건너뜀"),
+            ),
+        )
+        engine.start("climate", fromBeginning = true, now)
+        assertNull(engine.state.results["temp"])
+        assertEquals(Outcome.COMPLETED, engine.state.results["light"]?.outcome)
+    }
+
+    @Test fun `없는 코스는 시작하지 않는다`() {
+        engine.start("nope", fromBeginning = true, now)
+        assertEquals(Mode.Idle, engine.state.mode)
+    }
+
     @Test fun `모두 완료하거나 미지원이면 마스터`() {
-        engine.start(true, now)
+        engine.start("all", true, now)
         change(VehicleSignal.LOW_BEAM, "OFF", "ON")
         change(VehicleSignal.LOW_BEAM, "ON", "OFF")
         change(VehicleSignal.DRIVER_TEMPERATURE, 22.0f, 21.0f)

@@ -69,7 +69,7 @@ class OpeningDirector(
     fun startTutorial() {
         AppLog.i(TAG, "UI start from opening")
         _visible.value = false
-        tutorial.start(fromBeginning = true)
+        tutorial.start(courseId = "basic", fromBeginning = true)
     }
 
     fun dismiss() {

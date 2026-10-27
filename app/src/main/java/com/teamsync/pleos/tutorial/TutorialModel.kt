@@ -17,6 +17,15 @@ data class TutorialStep(
     val valueLabel: (Any?) -> String,
 )
 
+/** 상황별 코스. 단계는 여러 코스에 속할 수 있고, 결과는 단계 id로 공유된다. */
+data class Course(
+    val id: String,
+    val title: String,
+    /** 언제 필요한지 한 줄 ("주유소·충전소·정비소에서"). */
+    val subtitle: String,
+    val stepIds: List<String>,
+)
+
 data class Phase(
     /** 단계 시작 시점의 값(original)을 보고 문구를 고른다 (예: 이미 켜져 있으면 "꺼 보세요"). 화면과 TTS에 같이 쓴다. */
     val instruction: (original: Any?) -> String,
@@ -52,6 +61,13 @@ object Goals {
         val start = (it.phaseStart as Number).toFloat()
         val now = (it.current as Number).toFloat()
         start - now >= delta - EPSILON
+    }
+
+    /** 숫자 값이 phase 시작보다 [delta] 이상 커짐 (바람 세기 한 단계 올리기 등). */
+    fun increasedBy(delta: Float) = Goal("$delta 이상 증가") {
+        val start = (it.phaseStart as Number).toFloat()
+        val now = (it.current as Number).toFloat()
+        now - start >= delta - EPSILON
     }
 
     /** 숫자 값이 phase 시작에서 [delta] 이상 움직임 (방향 무관 — 창문 값의 0=닫힘 여부가 문서에 없어서). */

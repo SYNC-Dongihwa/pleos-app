@@ -36,6 +36,11 @@ data class TutorialState(
     val singleStep: Boolean = false,
     val parked: Boolean = false,
     val parkedReason: String? = null,
+    /** 진행 중이거나 결과를 보여주는 코스. */
+    val courseId: String = "",
+    /** 코스 안에서의 위치 (화면 "3 / 8"). */
+    val coursePos: Int = 0,
+    val courseSize: Int = 0,
 )
 
 /** 엔진이 바깥(컨트롤러)에 요청하는 부수 효과. 엔진 자체는 Android를 모른다 → 단위 테스트 가능. */
@@ -52,11 +57,15 @@ sealed interface Effect {
  */
 class TutorialEngine(
     val steps: List<TutorialStep>,
+    /** 상황별 코스 (+ 전체). 한 단계가 여러 코스에 들어갈 수 있고 결과는 단계 id로 공유. */
+    val courses: List<Course>,
     private val hintAfterMs: Long = HINT_AFTER_MS,
 ) {
     var state = TutorialState()
         private set
 
+    /** 이번 진행의 단계 순서 ([steps]의 인덱스). 코스 시작·다시 해보기 때 정해진다. */
+    private var order: List<Int> = emptyList()
     private var snapshot = VehicleState()
     private var original: Any? = null
     private var phaseStart: Any? = null
@@ -72,6 +81,18 @@ class TutorialEngine(
 
     val allResolved: Boolean get() = steps.all { it.id in state.results }
 
+    fun course(id: String): Course? = courses.firstOrNull { it.id == id }
+
+    /** 코스의 모든 단계에 결과가 있음. */
+    fun isCourseResolved(id: String): Boolean = course(id)?.stepIds?.all { it in state.results } == true
+
+    /** 코스 배지: 지원되는 단계를 모두 완료 (미지원 제외, 건너뜀이 있으면 아님). */
+    fun isCourseComplete(id: String): Boolean {
+        val ids = course(id)?.stepIds ?: return false
+        return ids.all { state.results[it]?.outcome in setOf(Outcome.COMPLETED, Outcome.UNSUPPORTED) } &&
+            ids.any { state.results[it]?.outcome == Outcome.COMPLETED }
+    }
+
     private val current: TutorialStep? get() = steps.getOrNull(state.stepIndex)
 
     // ---- 입력 ------------------------------------------------------------------------------
@@ -82,17 +103,25 @@ class TutorialEngine(
         log('I', "restore ${state.results.size}/${steps.size} results")
     }
 
-    fun start(fromBeginning: Boolean, now: Long): List<Effect> = effects {
+    /** [fromBeginning]이면 이 코스 단계의 결과만 지우고 처음부터 (다른 코스 결과는 유지). */
+    fun start(courseId: String, fromBeginning: Boolean, now: Long): List<Effect> = effects {
+        val c = course(courseId)
+        if (c == null) {
+            log('W', "start ignored: unknown course $courseId")
+            return@effects
+        }
         if (!state.parked) {
             log('W', "start ignored: not parked (${state.parkedReason})")
             return@effects
         }
-        val results = if (fromBeginning) emptyMap() else state.results
-        state = state.copy(mode = Mode.Running, results = results, singleStep = false, lastCompleted = null)
-        log('I', "START fromBeginning=$fromBeginning resolved=${results.size}/${steps.size}")
+        order = c.stepIds.map { id -> steps.indexOfFirst { it.id == id } }.filter { it >= 0 }
+        val results = if (fromBeginning) state.results - c.stepIds.toSet() else state.results
+        val resolved = c.stepIds.count { it in results }
+        state = state.copy(mode = Mode.Running, results = results, singleStep = false, lastCompleted = null, courseId = c.id, courseSize = order.size)
+        log('I', "START course=${c.id} fromBeginning=$fromBeginning resolved=$resolved/${order.size}")
         if (fromBeginning) fx += Effect.Save
-        prefix = if (results.isEmpty()) "튜토리얼을 시작할게요. " else "이어서 할게요. "
-        enter(nextUnresolved(from = 0), now)
+        prefix = if (resolved == 0) "${c.title} 코스를 시작할게요. " else "${c.title} 코스를 이어서 할게요. "
+        enter(nextUnresolved(fromPos = 0), now)
     }
 
     fun retry(stepId: String, now: Long): List<Effect> = effects {
@@ -102,10 +131,11 @@ class TutorialEngine(
             return@effects
         }
         // 이전 결과는 새 결과가 기록될 때까지 유지 — 다시 해보기 도중 그만두면 원래 결과가 남는다 (10-27 화면 확인 중 발견)
-        state = state.copy(mode = Mode.Running, singleStep = true, lastCompleted = null)
+        order = listOf(index)
+        state = state.copy(mode = Mode.Running, singleStep = true, lastCompleted = null, courseSize = 1)
         log('I', "RETRY $stepId")
         prefix = ""
-        enter(index, now)
+        enter(0, now)
     }
 
     fun skip(now: Long): List<Effect> = effects {
@@ -116,8 +146,9 @@ class TutorialEngine(
         log('I', "SKIP ${step.id} phase=${state.phaseIndex + 1}/${step.phases.size} ($seen)")
         prefix = "${topic(step.title)} 건너뛸게요. "
         if (state.mode is Mode.Paused) {
-            // 일시정지 중 건너뛰기는 기록만, 다음 단계는 재개할 때 시작
-            state = state.copy(stepIndex = nextUnresolved(state.stepIndex + 1), phaseIndex = 0, instruction = null, evidence = emptyList(), waiting = WAIT_RESUME)
+            // 일시정지 중 건너뛰기는 기록만, 다음 단계는 재개할 때 시작 (다음이 없으면 stepIndex=-1 → 재개 시 완료 화면)
+            val pos = if (state.singleStep) order.size else nextUnresolved(state.coursePos + 1)
+            state = state.copy(coursePos = pos, stepIndex = order.getOrElse(pos) { -1 }, phaseIndex = 0, instruction = null, evidence = emptyList(), waiting = WAIT_RESUME)
         } else {
             next(now)
         }
@@ -129,8 +160,9 @@ class TutorialEngine(
         fx += Effect.Save
     }
 
-    fun showResults(): List<Effect> = effects {
-        state = state.copy(mode = Mode.Finished, singleStep = false)
+    fun showResults(courseId: String): List<Effect> = effects {
+        val c = course(courseId) ?: return@effects
+        state = state.copy(mode = Mode.Finished, singleStep = false, courseId = c.id, courseSize = c.stepIds.size)
     }
 
     fun repeat(): List<Effect> = effects {
@@ -232,12 +264,13 @@ class TutorialEngine(
 
     // ---- 내부 ------------------------------------------------------------------------------
 
-    private fun enter(index: Int, now: Long) {
-        if (index !in steps.indices) {
+    /** [pos] = 이번 진행 순서([order]) 안의 위치. 범위를 벗어나면 끝. */
+    private fun enter(pos: Int, now: Long) {
+        if (pos !in order.indices) {
             finish()
             return
         }
-        state = state.copy(stepIndex = index, phaseIndex = 0, instruction = null, waiting = null, hint = null, evidence = emptyList(), currentValue = null)
+        state = state.copy(stepIndex = order[pos], coursePos = pos, phaseIndex = 0, instruction = null, waiting = null, hint = null, evidence = emptyList(), currentValue = null)
         tryBegin(now)
     }
 
@@ -279,20 +312,28 @@ class TutorialEngine(
     }
 
     private fun next(now: Long) {
-        if (state.singleStep) finish() else enter(nextUnresolved(state.stepIndex + 1), now)
+        if (state.singleStep) finish() else enter(nextUnresolved(state.coursePos + 1), now)
     }
 
-    private fun nextUnresolved(from: Int): Int {
-        val i = (from until steps.size).firstOrNull { steps[it].id !in state.results }
-        return i ?: steps.size
-    }
+    /** [fromPos]부터 결과가 없는 첫 위치. 없으면 order.size (= 끝). */
+    private fun nextUnresolved(fromPos: Int): Int =
+        (fromPos until order.size).firstOrNull { steps[order[it]].id !in state.results } ?: order.size
 
     private fun finish() {
-        val counts = Outcome.entries.associateWith { o -> state.results.values.count { it.outcome == o } }
-        state = state.copy(mode = Mode.Finished, instruction = null, waiting = null, hint = null, singleStep = false)
-        log('I', "FINISH ${counts.map { "${it.key}=${it.value}" }} master=$isMaster")
+        val c = course(state.courseId)
+        val ids = c?.stepIds?.toSet() ?: steps.map { it.id }.toSet()
+        val counts = Outcome.entries.associateWith { o -> state.results.filterKeys { it in ids }.values.count { it.outcome == o } }
+        val single = state.singleStep
+        state = state.copy(mode = Mode.Finished, instruction = null, waiting = null, hint = null, singleStep = false, courseSize = ids.size)
+        log('I', "FINISH course=${state.courseId} ${counts.map { "${it.key}=${it.value}" }} courseComplete=${isCourseComplete(state.courseId)} master=$isMaster")
         val summary = "완료 ${counts[Outcome.COMPLETED]}개, 건너뜀 ${counts[Outcome.SKIPPED]}개, 지원 안 됨 ${counts[Outcome.UNSUPPORTED]}개예요."
-        speak(prefix + if (allResolved) "튜토리얼을 마쳤어요. $summary" + (if (isMaster) " 내 차 마스터 배지를 받았어요!" else "") else summary)
+        val badge = when {
+            isMaster -> " 내 차 마스터 배지를 받았어요!"
+            isCourseComplete(state.courseId) -> " ${c?.title} 코스를 모두 익혔어요!"
+            else -> ""
+        }
+        val head = if (single || c == null) "" else "${c.title} 코스를 마쳤어요. "
+        speak(prefix + head + summary + badge)
         prefix = ""
         fx += Effect.Save
     }
