@@ -15,6 +15,7 @@ import ai.pleos.playground.vehicle.constant.area.TurnSignalValue
 import ai.pleos.playground.vehicle.constant.area.WindowValue
 import ai.pleos.playground.vehicle.constant.control.DrivingModeType
 import ai.pleos.playground.vehicle.constant.control.LightState
+import ai.pleos.playground.vehicle.constant.control.LightSwitch
 import ai.pleos.playground.vehicle.constant.control.WiperState
 import ai.pleos.playground.vehicle.constant.unit.TemperatureUnit
 import ai.pleos.playground.vehicle.listener.DoorLockStateListener
@@ -112,6 +113,35 @@ class VehicleStateRepository(private val context: Context) {
         }
         vehicle = null
         _state.value = VehicleState()
+    }
+
+    /**
+     * 오프닝 실내등 연출 (차량 제어). 호출자가 `CONTROL_CAR_LIGHTS` 부여를 확인한 뒤에만 부른다.
+     * capability가 쓰기를 허용할 때만: 원래 스위치 값 get → ON → [durationMs] 뒤 원래 값으로 복구.
+     */
+    fun flashCabinLight(durationMs: Long) {
+        val v = vehicle ?: return AppLog.w(TAG, "CABIN skipped: Vehicle not initialized")
+        val api = v.getLight()
+        api.checkCabinLightSwitchCapabilities({ config: CapabilityConfig, values: List<LightSwitch> ->
+            AppLog.i(TAG, "CAP CABIN_LIGHT_SWITCH accessType=${config.accessType} values=$values")
+            if (config.accessType != AccessType.WRITE && config.accessType != AccessType.READ_WRITE) {
+                AppLog.w(TAG, "CABIN skipped: not writable")
+                return@checkCabinLightSwitchCapabilities
+            }
+            api.getCabinLightSwitch({ original ->
+                AppLog.i(TAG, "CABIN original=$original → ON")
+                api.setCabinLightSwitch(LightSwitch.ON, { set ->
+                    AppLog.i(TAG, "CABIN set → $set")
+                    scope.launch {
+                        delay(durationMs)
+                        val restore = original ?: LightSwitch.OFF
+                        api.setCabinLightSwitch(restore, { AppLog.i(TAG, "CABIN restored → $it") }) { e ->
+                            AppLog.e(TAG, "CABIN restore failed ${VehicleErrors.describe(e)}", e)
+                        }
+                    }
+                }) { e -> AppLog.e(TAG, "CABIN set failed ${VehicleErrors.describe(e)}", e) }
+            }) { e -> AppLog.e(TAG, "CABIN get failed ${VehicleErrors.describe(e)}", e) }
+        }) { e -> AppLog.w(TAG, "CABIN capability failed ${VehicleErrors.describe(e)}") }
     }
 
     // ---- 신호별 구독 ------------------------------------------------------------------------

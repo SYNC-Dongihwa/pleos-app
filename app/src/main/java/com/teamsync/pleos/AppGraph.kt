@@ -5,6 +5,7 @@ import com.teamsync.pleos.car.AaosCarMonitor
 import com.teamsync.pleos.car.GateState
 import com.teamsync.pleos.car.ParkingGate
 import com.teamsync.pleos.log.AppLog
+import com.teamsync.pleos.opening.OpeningDirector
 import com.teamsync.pleos.tutorial.ProgressStore
 import com.teamsync.pleos.tutorial.TutorialController
 import com.teamsync.pleos.vehicle.VehicleStateRepository
@@ -34,6 +35,8 @@ object AppGraph {
         private set
     lateinit var tutorial: TutorialController
         private set
+    lateinit var opening: OpeningDirector
+        private set
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -47,6 +50,8 @@ object AppGraph {
             .stateIn(scope, SharingStarted.Eagerly, GateState.Unknown("시작 중"))
         // 첫 모델 로드가 0.4~0.9초 걸려 미리 초기화 (CLAUDE.md §4 TTS)
         speech = SpeechGuide(app)
-        tutorial = TutorialController(vehicle, gate, speech, ProgressStore(app))
+        val store = ProgressStore(app)
+        tutorial = TutorialController(vehicle, gate, speech, store)
+        opening = OpeningDirector(app, vehicle, gate, tutorial, speech, store)
     }
 }

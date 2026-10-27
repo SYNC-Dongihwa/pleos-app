@@ -21,6 +21,7 @@ import com.teamsync.pleos.ui.Bg
 import com.teamsync.pleos.ui.DevPanel
 import com.teamsync.pleos.ui.FinishScreen
 import com.teamsync.pleos.ui.HomeScreen
+import com.teamsync.pleos.ui.OpeningScreen
 import com.teamsync.pleos.ui.TutorialScreen
 import com.teamsync.pleos.vehicle.VehicleConnection
 
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
             val errors by AppLog.errors.collectAsStateWithLifecycle()
             val tutorial by controller.state.collectAsStateWithLifecycle()
             val speech by AppGraph.speech.status.collectAsStateWithLifecycle()
+            val openingVisible by AppGraph.opening.visible.collectAsStateWithLifecycle()
             var devPanel by rememberSaveable { mutableStateOf(false) }
             val canStart = gate is GateState.Parked && vehicle.connection is VehicleConnection.Connected
 
@@ -44,6 +46,9 @@ class MainActivity : ComponentActivity() {
                 Box(Modifier.fillMaxSize().background(Bg)) {
                     when {
                         devPanel -> DevPanel(gate, car, vehicle, errors, tutorial, speech, onClose = { devPanel = false })
+                        openingVisible && tutorial.mode == Mode.Idle -> OpeningScreen(
+                            gate, canStart, onStart = AppGraph.opening::startTutorial, onLater = AppGraph.opening::dismiss,
+                        )
                         tutorial.mode == Mode.Running || tutorial.mode is Mode.Paused -> TutorialScreen(
                             tutorial, controller.steps, speech,
                             onSkip = controller::skip, onRepeat = controller::repeat, onQuit = controller::quit,

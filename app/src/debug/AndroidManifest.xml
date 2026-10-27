@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--
+        debug 빌드 전용: 오프닝 실내등 연출(차량 제어) 경로를 에뮬레이터에서 검증하기 위한 선언.
+        release(main) 매니페스트에는 넣지 않는다 — App Market 사전 승인 전 미승인 퍼미션 선언은 심사 탈락 (CLAUDE.md §5).
+    -->
+    <uses-permission android:name="pleos.car.permission.CONTROL_CAR_LIGHTS" />
+</manifest>

@@ -1,6 +1,7 @@
 package com.teamsync.pleos.tutorial
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -37,8 +38,19 @@ class ProgressStore(private val context: Context) {
         }
     }
 
+    suspend fun openingSeen(): Boolean =
+        runCatching { context.progressDataStore.data.first()[KEY_OPENING_SEEN] == true }
+            .onFailure { AppLog.e(TAG, "openingSeen read failed: ${it.message}", it) }
+            .getOrDefault(false)
+
+    suspend fun markOpeningSeen() {
+        runCatching { context.progressDataStore.edit { it[KEY_OPENING_SEEN] = true } }
+            .onFailure { AppLog.e(TAG, "markOpeningSeen failed: ${it.message}", it) }
+    }
+
     private companion object {
         const val TAG = "Progress"
         val KEY_RESULTS = stringPreferencesKey("results")
+        val KEY_OPENING_SEEN = booleanPreferencesKey("opening_seen")
     }
 }
