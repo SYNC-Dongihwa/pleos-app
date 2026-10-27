@@ -8,11 +8,11 @@
 사용 장면: 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허 운전자.
 
 ## 2. 현재 상태
-- **Phase 1·2·3 완료 10-27** (Phase 3: 오프닝·release 서명·시연 시나리오·README, STT는 선택이라 보류), 브랜치 `feat/car-tutorial`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
+- **Phase 1·2·3 완료 10-27** (Phase 3: 오프닝·release 서명·시연 시나리오·README, STT는 선택이라 보류). `feat/car-tutorial`을 10-27 `main`에 fast-forward 병합 → 작업 기준은 `main`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
   - 오프닝: `opening/OpeningDirector` — 첫 실행 또는 홈·튜토리얼 시작 전에 운전석 문 0→1(콜백, 60초 쿨다운) → 환영 화면·음성 → 시작하기. 실내등은 `CONTROL_CAR_LIGHTS` 부여 시에만 `flashCabinLight`(capability 쓰기 확인 → 원래 값 get → ON → 4초 뒤 복구).
   - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **APK는 아직 커밋 안 함** — 제출 직전 최종본만 커밋(41MB, 이력 비대 방지). 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
   - 시연: `docs/demo-scenario.md` + `tools/vc-demo.js`(`__demo.reset/door/run`) — release APK로 11단계 완주 2분 10초 실측.
-- **남은 일**: ① Playground에서 퍼미션 사전 승인 신청(§5, 사용자) ② 10/28 설명회 질문(§7 끝) ③ 시연 영상 녹화·기획서(MAU·Retention) ④ 제출 직전 최종 APK 커밋 + README 확인 ⑤ (선택) STT 음성 명령 "다음/다시/건너뛰기" — `RECORD_AUDIO`·STT 퍼미션 승인 필요, 미실측 ⑥ `feat/car-tutorial` → `main` 병합 여부 결정.
+- **남은 일**: ① Playground에서 퍼미션 사전 승인 신청(§5, 사용자) ② 10/28 설명회 질문(§7 끝) ③ 시연 영상 녹화·기획서(MAU·Retention) ④ 제출 직전 최종 APK 커밋 + README 확인 ⑤ (선택) STT 음성 명령 "다음/다시/건너뛰기" — `RECORD_AUDIO`·STT 퍼미션 승인 필요, 미실측.
   - 기반: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(신호 12개, `state` + 합쳐지지 않는 `changes`) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate` · 숨김 개발자 패널(제목 5탭).
   - 튜토리얼: `tutorial/TutorialSteps`(단계 = 데이터, 11단계) → `TutorialEngine`(순수 Kotlin 상태 기계, 효과 Speak/Log/Save 반환) → `TutorialController`(단일 스레드, 정차 복귀 800ms 디바운스, 1초 tick) · `ProgressStore`(DataStore) · `voice/SpeechGuide`(Pleos TTS, 새 안내가 이전 안내를 끊음) · 화면 `TutorialScreen`/`FinishScreen`/`HomeScreen`.
 - 일정: 접수 마감 11/15 23:59 (11/14 제출 목표). 10/28 설명회 질문은 §7 끝.
