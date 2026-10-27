@@ -8,11 +8,24 @@
 사용 장면: 신차 출고 첫날, 렌터카·카셰어링 첫 탑승, 초보·장롱면허 운전자.
 
 ## 2. 현재 상태
-- **Phase 1 (기반) 완료 10-27 · Phase 2 (튜토리얼 엔진·UI) 완료 10-27**, 브랜치 `feat/car-tutorial`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
+- **Phase 1·2·3 완료 10-27** (Phase 3: 오프닝·release 서명·시연 시나리오·README, STT는 선택이라 보류), 브랜치 `feat/car-tutorial`. 이전 앱은 태그 `archive/pleos-probe-2026-10-22`.
+  - 오프닝: `opening/OpeningDirector` — 첫 실행 또는 홈·튜토리얼 시작 전에 운전석 문 0→1(콜백, 60초 쿨다운) → 환영 화면·음성 → 시작하기. 실내등은 `CONTROL_CAR_LIGHTS` 부여 시에만 `flashCabinLight`(capability 쓰기 확인 → 원래 값 get → ON → 4초 뒤 복구).
+  - release: `apk/SYNC_MyCarTutorial_release.apk` (v1.0.0, v3 서명, 서명자 `CN=SYNC, O=SYNC`). **APK는 아직 커밋 안 함** — 제출 직전 최종본만 커밋(41MB, 이력 비대 방지). 키스토어는 repo 밖 `..\pleos-keystore\sync-release.jks`, 비밀번호는 repo 루트 `keystore.properties`(gitignore)에만 — **분실 시 같은 서명으로 업데이트 불가, 별도 백업 필요**.
+  - 시연: `docs/demo-scenario.md` + `tools/vc-demo.js`(`__demo.reset/door/run`) — release APK로 11단계 완주 2분 10초 실측.
+- **남은 일**: ① Playground에서 퍼미션 사전 승인 신청(§5, 사용자) ② 10/28 설명회 질문(§7 끝) ③ 시연 영상 녹화·기획서(MAU·Retention) ④ 제출 직전 최종 APK 커밋 + README 확인 ⑤ (선택) STT 음성 명령 "다음/다시/건너뛰기" — `RECORD_AUDIO`·STT 퍼미션 승인 필요, 미실측 ⑥ `feat/car-tutorial` → `main` 병합 여부 결정.
   - 기반: `AppGraph`(프로세스 단위) → `VehicleStateRepository`(신호 12개, `state` + 합쳐지지 않는 `changes`) · `AaosCarMonitor`(주행 규제·`GEAR_SELECTION`·`PARKING_BRAKE_ON`) · `ParkingGate` · 숨김 개발자 패널(제목 5탭).
   - 튜토리얼: `tutorial/TutorialSteps`(단계 = 데이터, 11단계) → `TutorialEngine`(순수 Kotlin 상태 기계, 효과 Speak/Log/Save 반환) → `TutorialController`(단일 스레드, 정차 복귀 800ms 디바운스, 1초 tick) · `ProgressStore`(DataStore) · `voice/SpeechGuide`(Pleos TTS, 새 안내가 이전 안내를 끊음) · 화면 `TutorialScreen`/`FinishScreen`/`HomeScreen`.
-- **다음 할 일 (Phase 3 — 시연·제출)**: "새 차 첫날" 오프닝(운전석 문 열림 → 환영 음성, 조명 연출은 `CONTROL_CAR_LIGHTS` 승인 시에만) → (선택) STT 다음/다시/건너뛰기 → README·서명 APK(`apk/팀명_앱이름_release.apk`) → 시연 영상용 콘솔 시나리오.
-- 일정: Phase 3 → 11/13, 접수 마감 11/15 23:59. 10/28 설명회 질문은 §7 끝.
+- 일정: 접수 마감 11/15 23:59 (11/14 제출 목표). 10/28 설명회 질문은 §7 끝.
+
+**Phase 3 검증 (10-27)** — 단위 테스트 28개 통과(오프닝 조건 4 추가).
+```
+SYNC/Opening: OPENING play trigger=first_launch parked=true            (pm clear 후 첫 실행)
+SYNC/Vehicle: CAP CABIN_LIGHT_SWITCH accessType=READ_WRITE → CABIN original=OFF → ON → (4초) restored → OFF   (debug, 서비스가 CONTROL_CAR_LIGHTS 확인)
+SYNC/Vehicle: VAL DRIVER_DOOR = 1 (live) → SYNC/Opening: OPENING play trigger=driver_door → 시작하기 → STEP low_beam start
+SYNC/Opening: OPENING lighting skipped: pleos.car.permission.CONTROL_CAR_LIGHTS not granted   (release)
+apksigner: Verified using v3 scheme: true · Signer DN: CN=SYNC, O=SYNC · 퍼미션 = §5 체크리스트 + SDK 병합분
+vc-demo.js run (release): 11단계 19:27:33→19:29:42, PAUSE/RESUME 포함, FINISH COMPLETED=10 UNSUPPORTED=1 master=true
+```
 
 **Phase 2 검증 (10-27)** — 콘솔만으로 11단계 완주: 완료 10 · 미지원 1(주행 모드) · 배지 "내 차 마스터". 단위 테스트 24개 통과(엔진 15). 그 밖에 확인: 20초 힌트, D 전환 즉시 일시정지 + 음성, 멈춘 동안 변화 무시, P 복귀 0.8초 뒤 재개, 건너뛰기, 강제 종료 후 "이어서 하기 (2 / 11)".
 ```
@@ -54,6 +67,10 @@ SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기
 | 10-27 | 일시정지는 즉시, 재개는 P 상태가 800ms 유지될 때. 재개 시 phase 기준값을 현재 값으로 다시 잡음 | §7-12 깜빡임 방지. "1도 내려 보세요"는 재개 시점부터 (원복 목표는 original 기준이라 영향 없음) |
 | 10-27 | 창문 1단계 = 방향 무관 2 이상 움직임 | 문서에 값 의미(0=닫힘) 없음. 실측상 0=닫힘으로 보이나 확정 아님 |
 | 10-27 | 배지 = 지원되는 단계를 모두 완료 (미지원은 감점 아님, 건너뜀이 있으면 없음) | 차종별 지원 차이를 사용자 탓으로 돌리지 않음 |
+| 10-27 | `CONTROL_CAR_LIGHTS`는 `src/debug` 매니페스트에만 선언 | release에 미승인 퍼미션 선언 = 심사 탈락. debug에서 실내등 경로를 실제로 검증 |
+| 10-27 | APK 파일명 `SYNC_MyCarTutorial_release.apk` (팀명 SYNC) | 규정 `팀명_앱이름_release.apk`, 한글 파일명 도구 호환 문제 회피. 바꾸려면 README·demo 문서 링크도 수정 |
+| 10-27 | release 축소·난독화 끔, v1·v2·v3 서명 설정 (AGP가 minSdk 28이라 v3만 넣음) | VehicleErrors가 SDK 예외를 리플렉션으로 읽음. Pleos 요구 = v3 |
+| 10-27 | STT 음성 명령 보류 | 선택 항목, 마이크·STT 퍼미션 승인 필요·미실측. 핵심 흐름에 영향 없음 |
 
 ## 4. SDK 메모 (출처 + 실측)
 출처 약어: **R** = `https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/Vehicle/vehicle/ai.pleos.playground.vehicle.api` (각 도메인 `/<domain>/entry`), **V** = `.../Vehicle/intro`, **E** = `.../Vehicle/vehicle-error-code`, **P** = `.../Vehicle/vehicle-permission`, **TTS** = `https://document.pleos.ai/docs/pleos-only/connect-sdk-pleos/TextToSpeech/intro`. 시그니처는 AAR(`Vehicle-2.3.2.aar` javap)로 대조함. [실측] = Pleos Connect Emulator 2.1.0 + Virtual Console.
@@ -106,7 +123,9 @@ Vehicle SDK 퍼미션은 **App Market 사전 승인된 것만 선언 가능** (�
 - 앱 로그 파일 (AAOS 앱 사용자 = user 10, 날짜는 에뮬레이터 PDT): `adb exec-out run-as com.teamsync.pleos --user 10 cat files/logs/app-YYYYMMDD.log`
 - SDK 내부 로그: `[Pleos][SDK]a`(앱 쪽), `[Pleos]u`(Vehicle 서비스), `[GAAS]`(TTS 엔진)
 - TTS가 응답 없이 멈추면: `adb shell am force-stop ai.pleos.playground.caas`
-- 단위 테스트(Phase 2~): `./gradlew :app:testDebugUnitTest` (test double은 `src/test`에만)
+- 단위 테스트: `./gradlew :app:testDebugUnitTest` (test double은 `src/test`에만)
+- release: `./gradlew :app:assembleRelease` (repo 루트 `keystore.properties` 필요) → `cp app/build/outputs/apk/release/app-release.apk apk/SYNC_MyCarTutorial_release.apk` → 서명 확인 `"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify --verbose --print-certs <apk>`. debug→release 전환 시 서명이 달라 `adb uninstall com.teamsync.pleos` 먼저
+- 오프닝 재확인: `adb shell pm clear --user 10 com.teamsync.pleos` 후 실행
 
 ## 7. 알려진 이슈 (문서 ≠ 실측, 근거 포함)
 1. **Gear**: 문서엔 Gear 도메인·`getGear()` 없음 ↔ AAR 2.3.2엔 `api.Gear` 존재, 컴파일 경고 "deprecated, use the Google GEAR_SELECTION property", 실측 `GEAR_PARK`/`GEAR_DRIVE` 수신.
