@@ -70,6 +70,7 @@ SYNC/Car: PROP GEAR_SELECTION = 8 D (live) → SYNC/Gate: gate → NotParked(기
 | 10-27 | `CONTROL_CAR_LIGHTS`는 `src/debug` 매니페스트에만 선언 | release에 미승인 퍼미션 선언 = 심사 탈락. debug에서 실내등 경로를 실제로 검증 |
 | 10-27 | APK 파일명 `SYNC_MyCarTutorial_release.apk` (팀명 SYNC) | 규정 `팀명_앱이름_release.apk`, 한글 파일명 도구 호환 문제 회피. 바꾸려면 README·demo 문서 링크도 수정 |
 | 10-27 | release 축소·난독화 끔, v1·v2·v3 서명 설정 (AGP가 minSdk 28이라 v3만 넣음) | VehicleErrors가 SDK 예외를 리플렉션으로 읽음. Pleos 요구 = v3 |
+| 10-27 | 다시 해보기는 새 결과가 기록될 때까지 이전 결과 유지 | README 화면 캡처 중 발견: 다시 해보기 → 그만하기 시 완료 결과가 지워짐 → 수정·단위 테스트·에뮬레이터 확인 |
 | 10-27 | STT 음성 명령 보류 | 선택 항목, 마이크·STT 퍼미션 승인 필요·미실측. 핵심 흐름에 영향 없음 |
 
 ## 4. SDK 메모 (출처 + 실측)
