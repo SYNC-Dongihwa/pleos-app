@@ -11,6 +11,8 @@
 - 정차 중(기어 P)에만 진행하고, 화면 문구와 **Pleos TextToSpeech(온디바이스)** 음성으로 안내한다.
 - 완료는 화면 버튼이 아니라 **Vehicle SDK 콜백으로 받은 실제 상태 전이**로만 판정한다. 바꾼 상태를 원래대로 되돌렸는지까지 확인한다.
 
+**▶ 시연 영상 (프로토타입): https://youtu.be/srU6gJEuNag** — Pleos Connect Emulator에서 실제로 동작하는 화면을 녹화했다.
+
 ## 이렇게 써요
 
 > 아래는 모두 **Pleos Connect Emulator 2.1.0에서 실제로 실행한 화면**이다 (가짜 화면·목업 없음). 차량 조작은 Virtual Console로 했다.
